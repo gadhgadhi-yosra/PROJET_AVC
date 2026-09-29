@@ -1,0 +1,8 @@
+1177 scans from 26 sites with >= 20 subjects (chance balanced accuracy = 0.038)
+
+A. histogram shape (scale-free)                  logreg         balanced acc = 0.626 ± 0.037
+A. histogram shape (scale-free)                  random forest  balanced acc = 0.683 ± 0.016
+B. raw intensity scale (log percentiles)         logreg         balanced acc = 0.324 ± 0.013
+B. raw intensity scale (log percentiles)         random forest  balanced acc = 0.666 ± 0.025
+C. geometry (voxel size, matrix, orientation)    logreg         balanced acc = 0.611 ± 0.043
+C. geometry (voxel size, matrix, orientation)    random forest  balanced acc = 0.868 ± 0.014
