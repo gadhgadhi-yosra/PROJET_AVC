@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from generalization.contrast import subject_ratio
-from generalization.data_raw import RawAtlasDataset, background_value, list_subjects, load_subject
+from generalization.data_raw import DEFAULT_ROOT, RawAtlasDataset, background_value, list_subjects, load_subject
 
 
 def world_centroid(label_map):
@@ -76,6 +76,42 @@ def test_volume_de_lesion_conserve_au_reechantillonnage(records):
     assert volume_1mm == pytest.approx(volume_native, rel=0.1)
 
 
+@pytest.mark.parametrize("name", ["sub-soop0001", "sub-soop0002", "sub-r009s001", "sub-r029s001"])
+def test_volume_du_cerveau_conserve(records, name):
+    native = load_subject(records.loc[name], spacing=None)
+    volume_native = float(native["brain"].data.sum()) * float(np.prod(native["t1"].spacing))
+    volume_1mm = float(load_subject(records.loc[name])["brain"].data.sum())
+    assert volume_1mm == pytest.approx(volume_native, rel=0.01)
+
+
+def tight_oblique_copy(record, tmp_path):
+    """Recopie un sujet recadré au plus près du cerveau, avec une affine oblique arrondie en float32."""
+    record = dict(record)
+    image = nib.load(record["t1_path"])
+    brain = np.asarray(image.dataobj) > 0
+    box = tuple(slice(index.min(), index.max() + 1) for index in
+                (np.nonzero(brain.any(axis=tuple(a for a in range(3) if a != axis)))[0] for axis in range(3)))
+    rotation = np.eye(4)
+    rotation[:2, :2] = [[np.cos(0.09), -np.sin(0.09)], [np.sin(0.09), np.cos(0.09)]]  # espacement 0,99999999
+    affine = (rotation @ image.affine).astype(np.float32).astype(np.float64)
+    for key in ("t1_path", "mask_path"):
+        data = np.asarray(nib.load(record[key]).dataobj)[box]
+        record[key] = str(tmp_path / f"{key}.nii.gz")
+        nib.save(nib.Nifti1Image(data, affine), record[key])
+    return record, int(brain.sum())
+
+
+def test_volume_deja_a_1mm_garde_sa_grille(records, tmp_path):
+    # Beaucoup de volumes réels sont à 1 mm, recadrés serré, avec une affine oblique : leur espacement
+    # vaut 0,99999997 et un rééchantillonnage « à 1 mm » leur retirerait une rangée de voxels au bord.
+    record, brain_voxels = tight_oblique_copy(records.loc["sub-r009s001"], tmp_path)
+    raw = load_subject(record, spacing=None, normalize=False)
+    subject = load_subject(record)
+    assert subject["t1"].spatial_shape == raw["t1"].spatial_shape
+    assert int(subject["brain"].data.sum()) == brain_voxels
+    assert torch.equal(subject["mask"].data, raw["mask"].data)
+
+
 def test_r029_fond_non_nul_et_valeurs_negatives(records):
     raw = load_subject(records.loc["sub-r029s001"], spacing=None, normalize=False)
     data, brain = raw["t1"].data, raw["brain"].data.bool()
@@ -118,6 +154,30 @@ def test_grilles_differentes_refusees(records, tmp_path):
     nib.save(nib.Nifti1Image(np.asarray(mask.dataobj), shifted), record["mask_path"])
     with pytest.raises(ValueError, match="grilles"):
         load_subject(record)
+
+
+def test_masque_sans_qform_lu_comme_son_image(records, tmp_path):
+    # Un masque qui n'a qu'un sform (qform_code = 0) est lu sur la grille de son image.
+    record = dict(records.loc["sub-r009s001"])
+    mask = nib.load(record["mask_path"])
+    rewritten = nib.Nifti1Image(np.asarray(mask.dataobj), mask.affine)
+    rewritten.header.set_qform(None, code=0)
+    rewritten.header.set_sform(mask.affine, code=1)
+    record["mask_path"] = str(tmp_path / "mask.nii.gz")
+    nib.save(rewritten, record["mask_path"])
+    assert int(nib.load(record["mask_path"]).header["qform_code"]) == 0
+    expected = load_subject(records.loc["sub-r009s001"])
+    assert torch.equal(load_subject(record)["mask"].data, expected["mask"].data)
+
+
+@pytest.mark.skipif(not DEFAULT_ROOT.is_dir(), reason="données ATLAS réelles absentes")
+@pytest.mark.parametrize("name", ["sub-r040s053", "sub-r040s087"])
+def test_masques_reels_de_r040(name):
+    # Ces deux masques (LAS, sans qform) sont lus retournés gauche-droite par SimpleITK, le lecteur
+    # par défaut de TorchIO : ils étaient refusés pour « grilles différentes » avant la lecture nibabel.
+    record = list_subjects(sites=["R040"]).set_index("subject", drop=False).loc[name]
+    subject = load_subject(record)
+    assert subject["mask"].data.sum() > 0 and subject["t1"].orientation == ("R", "A", "S")
 
 
 def test_rapport_lesion_tissu_voisin(subjects):

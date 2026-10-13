@@ -11,6 +11,7 @@ import csv
 import warnings
 from pathlib import Path
 
+import nibabel as nib
 import numpy as np
 import pandas as pd
 import torch
@@ -81,6 +82,35 @@ def background_value(data):
     return float(values[counts.argmax()])
 
 
+def read_nifti(path):
+    """Lit un volume avec nibabel : tenseur (1, X, Y, Z) en float32 et affine.
+
+    Même lecture que l'exploration et le pipeline Spark. Le lecteur par défaut de TorchIO
+    (SimpleITK) rejette le sform de deux masques de R040 (sub-r040s053, sub-r040s087, sans qform)
+    et les lit retournés gauche-droite par rapport à leur image.
+    """
+    image = nib.load(path)
+    data = np.asarray(image.dataobj, dtype=np.float32)
+    if data.ndim > 3:
+        data = data[..., 0]
+    return torch.from_numpy(data)[None], image.affine
+
+
+def resample_grid(image, spacing):
+    """Grille cible (forme, affine) à `spacing` mm, centrée sur le champ de vue et qui le couvre en entier.
+
+    `tio.Resample(spacing)` arrondit la taille vers le bas : il retire jusqu'à une rangée de voxels
+    par axe, donc du cerveau sur les volumes recadrés serré.
+    """
+    old_spacing, shape = np.array(image.spacing), np.array(image.spatial_shape)
+    new_shape = np.ceil(shape * old_spacing / spacing - 1e-3).astype(int)
+    centre = image.affine[:3, :3] @ ((shape - 1) / 2) + image.affine[:3, 3]
+    affine = np.eye(4)
+    affine[:3, :3] = image.affine[:3, :3] / old_spacing * spacing
+    affine[:3, 3] = centre - affine[:3, :3] @ ((new_shape - 1) / 2)
+    return tuple(int(n) for n in new_shape), affine
+
+
 def zscore_in_brain(subject, background=0.0):
     """Z-score calculé dans le cerveau ; le fond est mis à `background` (convention nnU-Net)."""
     data = subject["t1"].data.float()
@@ -102,26 +132,25 @@ def load_subject(record, spacing=1.0, normalize=True):
     `norm_std` pour revenir aux intensités brutes (brut = z * norm_std + norm_mean).
     """
     record = dict(record)
-    image = tio.ScalarImage(record["t1_path"])
-    mask = tio.LabelMap(record["mask_path"])
-    if image.spatial_shape != mask.spatial_shape or not np.allclose(image.affine, mask.affine, atol=1e-3):
+    data, affine = read_nifti(record["t1_path"])
+    mask, mask_affine = read_nifti(record["mask_path"])
+    if data.shape != mask.shape or not np.allclose(affine, mask_affine, atol=1e-3):
         raise ValueError(f"{record['subject']} : image et masque sur des grilles différentes")
-    data = image.data[:1].float()
     # Cerveau = voxels au-dessus du fond, pas « > 0 » : à R029 le fond vaut ~0,0007.
     brain = data > background_value(data)
     # Jamais « == 1 » : certains masques codent la lésion 0,99999998.
-    lesion = mask.data[:1] > 0.5
+    lesion = mask > 0.5
     lesion_voxels_raw = int(lesion.sum())
-    affine = image.affine
     subject = tio.Subject(
         t1=tio.ScalarImage(tensor=data, affine=affine),
         mask=tio.LabelMap(tensor=lesion.to(torch.uint8), affine=affine),
         brain=tio.LabelMap(tensor=brain.to(torch.uint8), affine=affine),
     )
     subject = tio.ToCanonical()(subject)
-    if spacing is not None:
+    # Un volume déjà à la bonne résolution garde sa grille : pas d'interpolation inutile.
+    if spacing is not None and not np.allclose(subject["t1"].spacing, spacing, atol=1e-3):
         # Interpolation linéaire pour l'image, plus proche voisin pour les masques.
-        subject = tio.Resample(spacing)(subject)
+        subject = tio.Resample(resample_grid(subject["t1"], spacing))(subject)
     lesion_voxels = int(subject["mask"].data.sum())
     if lesion_voxels == 0:
         if lesion_voxels_raw:
