@@ -1,0 +1,19 @@
+cnn_random_init: trainable 24.4M / 24.4M params, budget 8.0 min
+  it 200  1.0 min  loss 1.221  3.4 it/s
+  it 400  1.6 min  loss 0.900  4.3 it/s
+  it 600  2.2 min  loss 0.736  4.6 it/s
+  it 800  2.7 min  loss 0.664  4.9 it/s
+  it 1000  3.3 min  loss 0.563  5.0 it/s
+  it 1200  3.9 min  loss 0.544  5.1 it/s
+  it 1400  4.5 min  loss 0.503  5.2 it/s
+  it 1600  5.1 min  loss 0.504  5.2 it/s
+  it 1800  5.7 min  loss 0.460  5.3 it/s
+  it 2000  6.3 min  loss 0.448  5.3 it/s
+  it 2200  6.9 min  loss 0.437  5.3 it/s
+  it 2400  7.5 min  loss 0.415  5.3 it/s
+trained 2573 iterations (41168 slices) in 8.0 min
+eval 513 cases in 6.7 min
+        dice  lesion_f1  abs_vol_diff_ml
+split                                   
+ID     0.375      0.310            6.646
+OOD    0.448      0.328            9.546
