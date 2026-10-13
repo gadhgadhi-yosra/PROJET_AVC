@@ -1,5 +1,6 @@
 .venv/
 .venv-spark/
+.venv-dl/
 data/raw/
 .ipynb_checkpoints/
 
@@ -20,3 +21,6 @@ __pycache__/
 .tools/
 data/preprocessing_s3*/
 artifacts/
+
+# Généralisation : figures et mesures de visual_check.py (coupes de patients, à régénérer en local)
+generalization/figures/
