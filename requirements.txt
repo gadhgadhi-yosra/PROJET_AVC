@@ -1,0 +1,11 @@
+# Environnement du pipeline de prétraitement (Python 3.12, Java 17)
+#   python3.12 -m venv .venv-spark && .venv-spark/bin/pip install -r requirements.txt
+#   export PYSPARK_PYTHON=$PWD/.venv-spark/bin/python   # sinon les workers Spark prennent le python3 du système
+pyspark==4.2.0
+nibabel==5.4.2
+SimpleITK==2.5.6
+numpy==2.0.1  # compatible avec le paquet binaire ANTsPy pour Mac Intel
+pandas==2.3.3   # PySpark 4.2 ne supporte pas encore pandas 3
+pyarrow==26.0.0
+scipy==1.18.1
+antspyx==0.5.4
