@@ -1,0 +1,34 @@
+training voxels: 1390472 (28.1% lesion)  [2.1 min]
+  fitted ml_logistic_regression  [2.1 min]
+  fitted ml_random_forest  [2.7 min]
+  fitted ml_gradient_boosting  [3.3 min]
+random forest feature importance:
+asym         0.279
+dist_edge    0.131
+x_lat        0.128
+z            0.096
+y            0.092
+std2         0.079
+g4           0.055
+g1           0.041
+t1           0.036
+grad         0.033
+g2           0.030
+  ml_logistic_regression: threshold 0.7 (tuning Dice 0.184)
+  ml_random_forest: threshold 0.85 (tuning Dice 0.301)
+  ml_gradient_boosting: threshold 0.9 (tuning Dice 0.314)
+  eval 50/300  [15.0 min]
+  eval 100/300  [22.2 min]
+  eval 150/300  [29.6 min]
+  eval 200/300  [36.1 min]
+  eval 250/300  [42.9 min]
+  eval 300/300  [48.3 min]
+                               dice  lesion_f1  abs_vol_diff_ml
+model                  split                                   
+ml_gradient_boosting   ID     0.325      0.061           14.777
+                       OOD    0.378      0.053           11.071
+ml_logistic_regression ID     0.156      0.045           23.940
+                       OOD    0.207      0.043           21.396
+ml_random_forest       ID     0.280      0.100           16.394
+                       OOD    0.325      0.113           13.644 
+done in 48.3 min

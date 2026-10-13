@@ -1,0 +1,22 @@
+cnn_pretrained_freeze-partial: trainable 23.1M / 24.4M params, budget 8.0 min
+  it 200  0.8 min  loss 1.207  4.2 it/s
+  it 400  1.3 min  loss 0.718  5.3 it/s
+  it 600  1.7 min  loss 0.493  5.8 it/s
+  it 800  2.2 min  loss 0.463  6.0 it/s
+  it 1000  2.7 min  loss 0.428  6.2 it/s
+  it 1200  3.2 min  loss 0.425  6.3 it/s
+  it 1400  3.7 min  loss 0.376  6.3 it/s
+  it 1600  4.2 min  loss 0.379  6.4 it/s
+  it 1800  4.7 min  loss 0.370  6.4 it/s
+  it 2000  5.1 min  loss 0.370  6.5 it/s
+  it 2200  5.6 min  loss 0.353  6.5 it/s
+  it 2400  6.1 min  loss 0.351  6.5 it/s
+  it 2600  6.6 min  loss 0.331  6.6 it/s
+  it 2800  7.1 min  loss 0.331  6.6 it/s
+  it 3000  7.6 min  loss 0.323  6.6 it/s
+trained 3186 iterations (50976 slices) in 8.0 min
+eval 513 cases in 6.5 min
+        dice  lesion_f1  abs_vol_diff_ml
+split                                   
+ID     0.464      0.319            5.288
+OOD    0.519      0.341            6.324

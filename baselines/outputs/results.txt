@@ -1,0 +1,72 @@
+Stroke lesion segmentation - validation metrics, ID vs OOD (sorted by ID Dice)
+==============================================================================================================
+ID  = 149 new patients from 36 training centres
+OOD = 150 patients from 14 centres never seen in training
+Dice, lesion F1, volume diff (mL), count diff = means; HD95 = median (mm); gap = Dice(ID) - Dice(OOD), 95 % bootstrap CI
+
+                         description  dice_ID  dice_OOD    gap  gap_ci_low  gap_ci_high  gap_size_adj  hd95_ID  hd95_OOD  vol_diff_ml_ID  vol_diff_ml_OOD  lesion_f1_ID  lesion_f1_OOD  count_diff_ID  count_diff_OOD
+      CNN pretrained, full fine-tune    0.496     0.516 -0.020      -0.092        0.054        -0.016   18.881    11.704           5.275            5.641         0.350          0.347          4.685           4.567
+CNN pretrained, early encoder frozen    0.486     0.517 -0.030      -0.102        0.043        -0.026   21.386     8.243           5.018            5.520         0.332          0.360          6.651           4.680
+CNN pretrained, whole encoder frozen    0.474     0.512 -0.038      -0.112        0.035        -0.032   18.911    13.568           5.877            5.204         0.330          0.290          6.678           6.700
+    CNN random init (no pretraining)    0.396     0.440 -0.044      -0.115        0.028        -0.036   29.275    20.865           6.707            8.640         0.328          0.335          3.671           3.827
+                ML gradient boosting    0.325     0.378 -0.052      -0.112        0.007        -0.048   39.064    37.912          14.777           11.071         0.061          0.053         80.396          67.640
+                    ML random forest    0.280     0.325 -0.045      -0.103        0.013        -0.039   40.386    32.218          16.394           13.644         0.100          0.113         33.611          29.973
+              ML logistic regression    0.156     0.207 -0.051      -0.096       -0.006        -0.038   55.588    54.659          23.940           21.396         0.045          0.043         61.906          54.767
+
+CNN models on all evaluation cases (225 ID + 287 OOD):
+                         description  dice_ID  dice_OOD    gap  gap_ci_low  gap_ci_high  gap_size_adj  hd95_ID  hd95_OOD  vol_diff_ml_ID  vol_diff_ml_OOD  lesion_f1_ID  lesion_f1_OOD  count_diff_ID  count_diff_OOD
+      CNN pretrained, full fine-tune    0.474     0.526 -0.052      -0.107        0.002        -0.032   21.500    11.747           5.354            6.276         0.340          0.330          5.084           4.735
+CNN pretrained, early encoder frozen    0.464     0.519 -0.055      -0.110        0.002        -0.034   24.548     9.434           5.288            6.324         0.319          0.341          6.964           4.944
+CNN pretrained, whole encoder frozen    0.458     0.516 -0.058      -0.112       -0.003        -0.036   22.291    13.820           5.770            6.021         0.312          0.287          7.160           7.111
+    CNN random init (no pretraining)    0.375     0.448 -0.072      -0.128       -0.018        -0.048   30.053    20.865           6.646            9.546         0.310          0.328          3.982           4.195
+
+Best CNN on ID validation: CNN pretrained, full fine-tune (all its evaluation cases)
+--------------------------------------------------------------------------------------------------------------
+Median lesion volume: ID 3.7 mL, OOD 5.6 mL
+
+OOD centres with >= 3 cases, worst to best:
+       n   dice  median_lesion_ml
+site                             
+R049  24  0.170             0.754
+R039   4  0.287             1.426
+R005  37  0.501             1.620
+R034  24  0.517             2.370
+R015  23  0.521            18.838
+R047  48  0.538            10.630
+R029  10  0.563             3.857
+R048  44  0.563             8.466
+R027  32  0.607            11.165
+R062   8  0.611            11.998
+R030  15  0.628            17.124
+R003  15  0.723            15.334
+
+ID centres with >= 3 cases, worst to best:
+       n   dice  median_lesion_ml
+site                             
+R050   3  0.000             0.202
+R009  23  0.216             1.412
+R056   3  0.259             1.322
+R052   7  0.301             2.579
+R010   5  0.303             0.663
+R038  18  0.353             2.124
+R067   6  0.376            27.670
+R019   3  0.379             0.326
+R001   8  0.432             2.434
+R035   3  0.448             1.049
+SOOP  34  0.463             9.481
+R061   3  0.465             2.774
+R071   5  0.477             1.409
+R017   4  0.491            20.869
+R069   8  0.516             3.750
+R031   8  0.534             4.206
+R058   7  0.594             5.964
+R040  18  0.624            30.980
+R042   7  0.624           118.441
+R011   6  0.636             2.071
+R023   3  0.660            12.884
+R028   5  0.670            19.365
+R059   7  0.697            26.159
+R024   4  0.721             8.270
+R002   3  0.753             7.328
+R004   7  0.837            48.594
+R057   3  0.848             4.570

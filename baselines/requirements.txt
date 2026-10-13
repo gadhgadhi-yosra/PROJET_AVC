@@ -1,0 +1,11 @@
+# GPU PyTorch: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+torch
+segmentation-models-pytorch
+nnunetv2
+scikit-learn
+scipy
+nibabel
+numpy
+pandas
+pyarrow
+matplotlib
