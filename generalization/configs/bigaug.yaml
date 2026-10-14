@@ -1,0 +1,43 @@
+# Preset de type BigAug (Zhang et al., IEEE TMI 2020) : transformations empilées, p = 0,5 chacune,
+# dans l'ordre qualité d'image -> apparence -> spatial.
+# Reprises de l'article : flou, décalage de luminosité, rotation. Adoucies pour ne pas détruire
+# les petites lésions : bruit (0,1-1,0 dans l'article), échelle (0,4-1,6), déformation, gamma.
+# Les trois dernières sont spatiales : elles déplacent aussi le masque (plus proche voisin).
+transforms:
+  - name: blur
+    p: 0.5
+    sigma_mm: [0.25, 1.5]
+
+  - name: sharpen
+    p: 0.5
+    amount: [0.5, 2.0]
+    sigma_mm: 1.0
+
+  - name: noise
+    p: 0.5
+    std: [0.0, 0.3]
+
+  - name: brightness
+    p: 0.5
+    shift: [-0.1, 0.1]
+    scale: [0.9, 1.1]
+
+  - name: gamma
+    p: 0.5
+    # 0,5 à 4,5 dans l'article. Sur données réelles, un gamma de 2,5 met déjà 10 à 22 % du cerveau
+    # au noir (82 % à 4,5 pour R008) et 0,5 divise par deux le contraste des lésions peu visibles :
+    # on garde la plage calibrée de intensity.yaml.
+    gamma: [0.7, 1.85]
+
+  - name: affine
+    p: 0.5
+    scales: [0.8, 1.2]
+    degrees: 20
+    isotropic: true
+    default_pad_value: 0      # valeur du fond après z-score (data_raw)
+
+  - name: elastic
+    enabled: false            # lent sur CPU (B-spline) ; à activer si le budget le permet
+    p: 0.5
+    num_control_points: 7
+    max_displacement: 5.0

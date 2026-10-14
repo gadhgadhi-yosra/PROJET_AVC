@@ -1,0 +1,7 @@
+# Randomisation du style par convolution aléatoire (RandConv, Xu et al., ICLR 2021).
+transforms:
+  - name: randconv
+    p: 0.5
+    kernel_sizes: [1, 3, 5, 7]
+    mix: [0.0, 0.5]           # poids de l'image stylisée ; [0, 1] dans l'article, plafonné pour garder la lésion visible
+    allow_inversion: false    # true = comportement de l'article (le contraste peut s'inverser)

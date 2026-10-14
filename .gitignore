@@ -1,3 +1,26 @@
 .venv/
+.venv-spark/
+.venv-dl/
 data/raw/
 .ipynb_checkpoints/
+
+# Extracted MRI data (ATLAS data use agreement: do not redistribute)
+data/ATLAS3_Training_Raw/
+*.tar.gz
+*.nii.gz
+
+# Per-subject outputs of exploration/01_compute_stats.py (regenerate locally)
+exploration/outputs/subjects*.parquet
+exploration/outputs/histograms*.npz
+exploration/outputs/*.log
+
+__pycache__/
+.DS_Store
+
+# Local Java and private preprocessing outputs
+.tools/
+data/preprocessing_s3*/
+artifacts/
+
+# Généralisation : figures et mesures de visual_check.py (coupes de patients, à régénérer en local)
+generalization/figures/

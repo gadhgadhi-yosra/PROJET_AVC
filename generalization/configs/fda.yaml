@@ -1,0 +1,12 @@
+# FDA, Fourier Domain Adaptation (Yang & Soatto, CVPR 2020) : l'amplitude basse fréquence est
+# échangée avec celle d'une image d'un autre centre, la phase est conservée.
+transforms:
+  - name: fda
+    p: 0.5
+    # Demi-côté du cube échangé = beta x plus petit côté ; 0 = identité. Plage réglée sur données réelles
+    # (visual_check --fda-betas) : sous 0,015 l'effet est négligeable ; au-delà de 0,05 certaines lésions
+    # perdent plus de la moitié de leur contraste.
+    beta: [0.015, 0.03]
+    # Provisoire : à choisir parmi les centres d'ENTRAÎNEMENT une fois splits.json fixé.
+    reference_sites: [R009]
+    n_references: 8           # images de référence gardées en mémoire par processus
