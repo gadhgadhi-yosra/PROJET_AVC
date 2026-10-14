@@ -1,21 +1,36 @@
 # Dataset AVC
 
-`raw/atlas3_training_raw.tar.gz` est un lien symbolique vers le fichier original :
-`/Users/yosragadhgadhi/Downloads/atlas3_training_raw.tar.gz`.
+Les données ne sont pas versionnées (accord d'utilisation ATLAS : ne pas redistribuer).
 
-Le fichier original doit rester à cet emplacement pour que le lien fonctionne.
-Le lien évite une copie de 7,7 Go.
+## Organisation
 
-## Accès aux images
+```
+data/
+├── ATLAS3_Training_Raw/          # données extraites, lues par les scripts
+│   └── <SITE>/sub-*/ses-1/anat/  # 55 centres, 1 453 sujets
+│       ├── *_desc-brain_T1w.nii.gz
+│       ├── *_label-lesion_desc-T1lesion_mask.nii.gz
+│       └── *_metadata.csv
+└── raw/
+    └── ATLAS_R3.0_raw.tar.gz     # archive d'origine (5,7 Go), sauvegarde
+```
 
-Le fichier est chiffré avec OpenSSL et encodé en Base64, malgré son extension `.tar.gz`.
-Il faut la procédure et les informations de déchiffrement fournies avec le téléchargement avant de pouvoir extraire les IRM.
-Prévoir suffisamment d’espace disque pour le déchiffrement et l’extraction.
+## Réextraire depuis l'archive
+
+```bash
+tar -xzf data/raw/ATLAS_R3.0_raw.tar.gz -C data
+```
+
+L'archive contient le dossier `ATLAS3_Training_Raw/` (1 453 IRM T1w). Prévoir environ 6 Go.
 
 ## Chemin depuis un notebook à la racine du projet
 
 ```python
 from pathlib import Path
-dataset = Path("data/raw/atlas3_training_raw.tar.gz")
-print("Dataset accessible :", dataset.is_file())
+root = Path("data/ATLAS3_Training_Raw")
+print(len(list(root.glob("*/sub-*/ses-*/anat/*_desc-brain_T1w.nii.gz"))))  # 1453
 ```
+
+## Préparation de la semaine 3
+
+Inventaire et géométrie RAS/1 mm : voir [`preprocessing/README.md`](../preprocessing/README.md). Les sorties intermédiaires sont dans `data/preprocessing_s3*/`, hors Git. Le dossier brut contient 1 453 paires IRM/masque ; les doublons de l’extraction partielle et le lien cassé ont été nettoyés après vérification le 13 octobre 2026.

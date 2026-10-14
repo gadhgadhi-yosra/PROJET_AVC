@@ -1,0 +1,9 @@
+# Harmonisation par histogram matching vers un centre de référence : baseline de prétraitement,
+# déterministe (p = 1), à appliquer aussi à la validation et au test.
+transforms:
+  - name: histogram_matching
+    p: 1.0
+    # Provisoire : à choisir parmi les centres d'ENTRAÎNEMENT une fois splits.json fixé.
+    reference_sites: [R009]
+    n_references: 20          # sujets moyennés pour l'histogramme de référence
+    # reference_file: generalization/artifacts/histref_R009.pt   # cache local (ignoré par Git)
