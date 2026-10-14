@@ -23,7 +23,7 @@ import torch
 from .contrast import subject_ratio
 from .data_raw import DEFAULT_ROOT, list_subjects, load_subject
 from .synthetic import write_synthetic_dataset
-from .transforms import build_transforms, load_config
+from .transforms import FDA, build_transforms, load_config
 
 HERE = Path(__file__).resolve().parent
 CONFIGS = HERE / "configs"
@@ -111,7 +111,7 @@ def histogram_panel(ax, subject, transformed, reference_quantiles):
     ax.set_yticks([])
     ax.grid(axis="x", color=GRID, linewidth=0.6)
     ax.set_axisbelow(True)
-    ax.legend(loc="upper left")
+    ax.legend(loc="best")
 
 
 def check_subject(family, rows, subject, out_dir, draws, stat_draws, seed):
@@ -179,6 +179,79 @@ def summarize(table):
     })
 
 
+def kept_by_site(table):
+    """Contraste conservé minimal, par transformation (lignes) et par centre (colonnes)."""
+    table = table.assign(kept=(1 - table["ratio_after"]) / (1 - table["ratio_before"]))
+    return table.pivot_table(index=["family", "transform"], columns="site", values="kept", aggfunc="min",
+                             sort=False).round(2)
+
+
+def check_fda_betas(subject, bank, betas, n_references, out_dir):
+    """Figure de calibrage de FDA : pour quelques images de référence, l'effet de chaque beta fixé.
+
+    Sous chaque image, la carte de différence à l'original (en écarts-types du cerveau) montre où
+    FDA agit. Retourne une ligne de mesures par (référence, beta).
+    """
+    data, brain = subject["t1"].data[0], subject["brain"].data[0].bool()
+    ratio_before = subject_ratio(subject)
+    window = tuple(np.percentile(data[brain].numpy(), [0.5, 99.5]))
+    box = brain_box(subject)
+    spacing = subject["t1"].spacing
+    aspect = spacing[1] / spacing[0]
+    original = axial_view(subject, window, box)
+    area = subject["mask"].data[0].sum(dim=(0, 1))
+    z = int(area.argmax()) if area.max() > 0 else data.shape[2] // 2
+    indices = sorted({round(i * (len(bank) - 1) / max(n_references - 1, 1)) for i in range(n_references)})
+    height = original[0].shape[0] * spacing[1] / (original[0].shape[1] * spacing[0])
+    n_cols = 1 + len(betas)
+    fig, axes = plt.subplots(2 * len(indices), n_cols, figsize=(2.3 * n_cols, (2.3 * height + 0.45) * 2 * len(indices) + 0.8),
+                             squeeze=False, layout="constrained")
+    difference_map = matplotlib.colors.LinearSegmentedColormap.from_list("difference", [BLUE, "#f0efec", ORANGE])
+    difference_map.set_bad("#000000")
+    records = []
+    for row, index in enumerate(indices):
+        image_axes, difference_axes = axes[2 * row], axes[2 * row + 1]
+        reference = bank[index].float()
+        source = bank.sources[index]
+        name = f"{source.record['site']} · {source.record['subject']}" if hasattr(source, "record") else f"n° {index}"
+        show(image_axes[0], *original, window, aspect, f"original · L/V {ratio_before:.2f}")
+        image_axes[0].set_ylabel("image", fontsize=9.5, color=INK, fontweight="bold")
+        resized = torch.nn.functional.interpolate(reference[None, None], size=data.shape, mode="trilinear")[0, 0]
+        target = resized[:, :, z].numpy()[box].T
+        show(difference_axes[0], np.where(target == 0, window[0], target), np.zeros((1, 1)), window, aspect,
+             f"référence : {name}")
+        difference_axes[0].set_ylabel("différence", fontsize=9.5, color=INK, fontweight="bold")
+        for column, beta in enumerate(betas, start=1):
+            torch.manual_seed(0)
+            out = FDA(references=[reference], beta=(beta, beta), p=1.0)(subject)
+            ratio_after = subject_ratio(out)
+            delta = (out["t1"].data[0] - data)
+            correlation = float(torch.corrcoef(torch.stack([out["t1"].data[0][brain], data[brain]]))[0, 1])
+            record = dict(site=subject["site"], subject=subject["subject"], reference=name, beta=beta,
+                          half_width=int(beta * min(data.shape)), ratio_before=ratio_before, ratio_after=ratio_after,
+                          kept=(1 - ratio_after) / (1 - ratio_before), rms_change=float(delta[brain].pow(2).mean().sqrt()),
+                          correlation=correlation)
+            records.append(record)
+            show(image_axes[column], *axial_view(out, window, box), window, aspect,
+                 f"β = {beta:g} (b = {record['half_width']}) · L/V {ratio_after:.2f}")
+            masked = np.ma.masked_where(~brain[:, :, z].numpy()[box].T, delta[:, :, z].numpy()[box].T)
+            difference_axes[column].imshow(masked, cmap=difference_map, origin="lower", vmin=-1, vmax=1, aspect=aspect,
+                                           interpolation="nearest")
+            difference_axes[column].set_title(f"écart {record['rms_change']:.2f} σ · r = {correlation:.3f}")
+            difference_axes[column].set_xticks([])
+            difference_axes[column].set_yticks([])
+            for spine in difference_axes[column].spines.values():
+                spine.set_visible(False)
+    fig.suptitle(f"calibrage de FDA — {subject['site']} · {subject['subject']}\nligne « différence » : après − avant, "
+                 "de −1 σ (bleu) à +1 σ (orange) du cerveau ; b = demi-côté du cube de fréquences échangé",
+                 x=0.01, ha="left", fontsize=10)
+    path = out_dir / f"fda_beta__{subject['site']}_{subject['subject']}.png"
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    print(f"  {path}")
+    return records
+
+
 def select_records(data_root, sites, subjects):
     """Un sujet par centre demandé : celui nommé dans `subjects`, sinon le premier avec une lésion."""
     table = list_subjects(data_root)
@@ -208,6 +281,9 @@ def main():
     parser.add_argument("--stat-draws", type=int, default=10, help="tirages utilisés pour mesurer le contraste")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, help="dossier de sortie (défaut : generalization/figures/<synthetic|raw>)")
+    parser.add_argument("--fda-betas", nargs="+", type=float,
+                        help="calibrage de FDA : une figure par sujet avec ces valeurs fixes de beta, à la place des familles")
+    parser.add_argument("--fda-references", type=int, default=2, help="images de référence montrées par sujet")
     args = parser.parse_args()
 
     out_dir = args.out or HERE / "figures" / ("synthetic" if args.synthetic else "raw")
@@ -221,6 +297,16 @@ def main():
             raise SystemExit(f"Données introuvables dans {data_root} : extraire l'archive ATLAS, passer --data-root, "
                              "ou utiliser --synthetic")
         subjects = [load_subject(record) for record in select_records(data_root, args.sites, args.subjects)]
+        if args.fda_betas:
+            bank = build_rows("fourier", data_root, args.reference_sites)[0][1][0].references
+            records = [record for subject in subjects
+                       for record in check_fda_betas(subject, bank, args.fda_betas, args.fda_references, out_dir)]
+            table = pd.DataFrame(records)
+            table.to_csv(out_dir / "fda_beta.csv", index=False)
+            with pd.option_context("display.width", 200, "display.max_columns", None):
+                print(table.groupby("beta")[["half_width", "kept", "rms_change", "correlation"]]
+                      .agg(["min", "median", "max"]).round(3))
+            return
         records = []
         for family in args.families:
             print(f"Famille « {family} »")
@@ -231,8 +317,11 @@ def main():
     table.to_csv(out_dir / "contraste_lesion.csv", index=False)
     summary = summarize(table)
     summary.to_csv(out_dir / "resume.csv")
+    by_site = kept_by_site(table)
+    by_site.to_csv(out_dir / "conserve_min_par_centre.csv")
     with pd.option_context("display.width", 200, "display.max_columns", None):
         print(f"\nRésumé sur {table['subject'].nunique()} sujets (détail : {out_dir / 'contraste_lesion.csv'})\n{summary}")
+        print(f"\nContraste conservé minimal par centre\n{by_site}")
 
 
 if __name__ == "__main__":

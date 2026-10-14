@@ -57,7 +57,7 @@ class FDA(BrainIntensityTransform):
     beta : plage du paramètre de FDA (fraction du plus petit côté) ; 0 = identité.
     """
 
-    def __init__(self, references, beta=(0.0, 0.03), **kwargs):
+    def __init__(self, references, beta=(0.015, 0.03), **kwargs):
         super().__init__(**kwargs)
         self.references = references if isinstance(references, ReferenceBank) else ReferenceBank(references)
         self.beta = tuple(beta)
