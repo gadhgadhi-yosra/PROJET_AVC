@@ -20,3 +20,10 @@ __pycache__/
 .tools/
 data/preprocessing_s3*/
 artifacts/
+
+# Private week 4 outputs, QC and nnU-Net data
+data/processed/
+data/qc_s4/
+data/validation_s4/
+data/benchmark_s4/
+data/nnUNet_raw/

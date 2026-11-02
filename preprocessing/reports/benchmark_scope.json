@@ -1,0 +1,10 @@
+{
+  "subjects": 8,
+  "repeats": 1,
+  "seed": 2026,
+  "scope": "Sous-ensemble de validation, pas le dataset complet",
+  "reserve_MiB": 512,
+  "timing": "compute_seconds: map/collect incluant lecture, calcul et \u00e9criture; JVM/Spark startup exclu. total_seconds inclut startup et nettoyage.",
+  "cache": "Cache syst\u00e8me non purg\u00e9; ordre m\u00e9lang\u00e9 d\u00e9terministe; aucune reprise des volumes",
+  "concurrency": "Workers Spark, pas des c\u0153urs physiques d\u00e9di\u00e9s"
+}
