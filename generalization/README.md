@@ -2,13 +2,13 @@
 
 Techniques de généralisation de la question RQ3 (§3.5 du document de projet) : augmentation d'intensité, randomisation du style, méthode de Fourier et harmonisation. Tout fonctionne sur les **données brutes** ATLAS v3, en attendant les données prétraitées du contrat C1.
 
-État au 14 octobre 2026 :
+État au 3 novembre 2026 :
 
-- les 138 tests passent sur des volumes synthétiques ;
-- le chargement a été vérifié sur les 1 416 sujets réels ;
-- les transformations ont été regardées sur un sujet de six centres (SOOP, R029, R009, R014, R008, R039) ;
-- deux défauts du chargement ont été corrigés (lecture de deux masques de R040, rééchantillonnage des volumes déjà à 1 mm) ;
-- deux réglages ont changé : le `beta` de FDA et le gamma du preset BigAug.
+- **recalibrage sur les seuls sujets d'entraînement de `splits.json`** : plages de gamma et de contraste, centre de référence R059 au lieu de R009, `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-du-3-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
+- les 155 tests passent sur des volumes synthétiques ;
+- le chargement a été vérifié sur les 1 416 sujets réels (14 octobre) ;
+- les transformations ont été regardées sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) ;
+- deux défauts du chargement ont été corrigés le 14 octobre (lecture de deux masques de R040, rééchantillonnage des volumes déjà à 1 mm).
 
 Ce qui reste à faire est [en fin de document](#reste-à-faire).
 
@@ -19,7 +19,8 @@ Ce qui reste à faire est [en fin de document](#reste-à-faire).
 | `configs/*.yaml` | Une configuration par famille, plus `baseline.yaml` (aucune transformation) |
 | `contrast.py` | Rapport d'intensité lésion / tissu voisin |
 | `synthetic.py` | Volumes synthétiques qui imitent les pièges des données réelles |
-| `visual_check.py` | Figures avant / après et mesure du contraste de la lésion |
+| `calibration.py`, `calibration.json` | Calibrage sur les seuls sujets d'entraînement de `splits.json` ; garde-fou contre les centres de test |
+| `visual_check.py` | Figures avant / après, mesure du contraste de la lésion, balayages de FDA et du gamma |
 | `benchmark.py` | Temps CPU par transformation |
 | `tests/` | Tests pytest, sans aucune donnée patient |
 
@@ -55,7 +56,7 @@ Une configuration est une liste de transformations, chacune avec un nom, une pro
 transforms:
   - name: gamma
     p: 0.3
-    gamma: [0.7, 1.85]
+    gamma: [0.71, 1.77]
   - name: noise
     enabled: false        # désactivée sans supprimer ses paramètres
     p: 0.2
@@ -68,7 +69,7 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 
 - **Masque du cerveau.** Une clé `"brain"` est utilisée si elle existe. Sinon le cerveau est estimé par les voxels différents de la valeur du fond.
 - **Graine.** L'aléa vient du générateur de PyTorch : `torch.manual_seed` ou `monai.utils.set_determinism` suffisent.
-- **Images de référence.** FDA et l'histogram matching lisent leurs images de référence dans `data_root` (argument de `build_transforms`, sinon clé `data_root` de la configuration).
+- **Images de référence.** FDA et l'histogram matching lisent leurs images de référence dans `data_root` (argument de `build_transforms`, sinon clé `data_root` de la configuration). Avec la clé `splits: splits.json` de leur entrée, un centre de référence de test est refusé et seuls les sujets d'entraînement servent de référence.
 
 **Passage aux données prétraitées (C1).** Les transformations ne dépendent que du `torchio.Subject` (clés `t1`, `mask`, `brain`). Il suffira d'écrire un chargeur équivalent à `load_subject` pour `data/processed/` ; le reste ne change pas.
 
@@ -92,8 +93,8 @@ Les transformations d'intensité ne modifient jamais le masque, gardent la forme
 
 | Nom YAML | Ce qu'elle fait | Défaut | Référence |
 |---|---|---|---|
-| `gamma` | Gamma sur le cerveau ramené à [0, 1], puis retour à l'échelle d'origine | `gamma: [0.7, 1.85]` | Isensee et al., nnU-Net, *Nature Methods* 2021 |
-| `contrast` | Étire les intensités autour de la moyenne du cerveau | `factor: [0.78, 1.56]` | idem |
+| `gamma` | Gamma sur le cerveau ramené à [0, 1], puis retour à l'échelle d'origine | `gamma: [0.71, 1.77]` | Isensee et al., nnU-Net, *Nature Methods* 2021 |
+| `contrast` | Étire les intensités autour de la moyenne du cerveau | `factor: [0.78, 1.52]` | idem |
 | `noise` | Bruit gaussien, en fraction de l'écart-type du cerveau | `std: [0, 0.1]` | idem |
 | `blur` | Flou gaussien | `sigma_mm: [0.25, 1.0]` | idem |
 | `bias_field` | Champ multiplicatif lisse (exponentielle d'un polynôme d'ordre 3) | `coefficients: 0.2` | Van Leemput et al., *IEEE TMI* 1999 ; Pérez-García et al., TorchIO, 2021 |
@@ -109,111 +110,153 @@ Le preset `bigaug.yaml` empile flou, netteté, bruit, luminosité, gamma et tran
 
 ## Calibrage
 
-Les plages viennent de `exploration/outputs/site_summary.csv`.
+**Règle : aucun réglage ne voit un centre de test.** Tous les réglages sont faits sur les seuls **sujets d'entraînement** de `splits.json` (917 sujets, 48 centres), sans les sujets du test ID, sans les six centres OOD (R008, R028, R031, R034, R053, SOOP) ni le centre exclu R032. Le module `calibration.py` lit `splits.json`, refuse tout centre tenu à l'écart et écrit le résultat agrégé par centre dans `calibration.json` (versionné). Les mesures par sujet restent en local dans `generalization\figures\calibration\`. `visual_check.py` se limite aussi aux sujets d'entraînement et refuse un centre de test, sauf avec `--include-held-out` (inspection seulement).
 
-- **Gamma, 0,7 à 1,85.** La position de la médiane du cerveau sur [0, p99] va de 0,40 (R030) à 0,70 (R032) selon le centre, pour une médiane de 0,60. Le gamma qui amène le centre médian sur chaque centre est `ln(position) / ln(0,60)`, soit 0,70 à 1,84.
-- **Contraste, 0,78 à 1,56.** Le coefficient de variation dans le cerveau va de 0,32 à 0,64, pour une médiane de 0,41. Le facteur est le rapport à cette médiane.
+```powershell
+.venv-dl\Scripts\python -m generalization.calibration          # gamma, contraste, centre de référence (~3 min)
+```
+
+Les tests de `tests/test_calibration.py` échouent si un centre de test apparaît dans un réglage ou une configuration, si les configurations ne reprennent pas `calibration.json`, ou si `splits.json` a changé depuis le calibrage.
+
+### Recalibrage du 3 novembre 2026
+
+Le premier réglage (14 octobre) avait été fait avant `splits.json`, sur tous les centres : il utilisait SOOP et R008, devenus des centres de test, et la borne basse du gamma venait de R032.
+
+| Paramètre | Avant (14 octobre, tous centres) | Après (sujets d'entraînement) | Fixé par |
+|---|---|---|---|
+| `gamma` de `intensity.yaml` | 0,7 – 1,85 | **0,71 – 1,77** | R014 – R030 |
+| `factor` de `contrast` | 0,78 – 1,56 | **0,78 – 1,52** | R020 – R030 |
+| `reference_sites` (FDA, histogram matching) | R009 (provisoire) | **R059** | distance au pool |
+| `beta` de FDA | 0,015 – 0,03 | **0,015 – 0,03** (inchangé, re-balayé) | balayage |
+| `gamma` du preset BigAug | 0,7 – 1,85 | **0,71 – 1,77** | balayage |
+
+Les méthodes sont celles du premier réglage ; seules les données changent :
+
+- **Gamma, 0,71 à 1,77.** La position de la médiane du cerveau sur [0, p99] va de 0,41 (R030) à 0,69 (R014) selon le centre d'entraînement, pour une médiane de 0,601. Le gamma qui amène le centre médian sur chaque centre est `ln(position) / ln(0,601)`, soit 0,719 à 1,765, arrondi vers l'extérieur.
+- **Contraste, 0,78 à 1,52.** Le coefficient de variation dans le cerveau va de 0,32 (R020) à 0,62 (R030), pour une médiane de 0,409. Le facteur est le rapport à cette médiane (0,787 à 1,519).
+- **Les extrêmes viennent de petits centres** (R020 : 1 sujet d'entraînement ; R014 : 7 ; R030 : 12), comme dans le premier réglage qui gardait tous les centres. C'est voulu : ce sont des styles réels que le modèle doit couvrir.
 - **Basse résolution.** Les résolutions natives vont de 0,47 mm à 1,5 mm isotrope (R049), avec des coupes jusqu'à 3 mm sur un seul axe. Sur une grille de 1 mm, seules les résolutions plus grossières que 1 mm sont simulables : 1 à 1,5 mm isotrope, ou 1 à 3 mm sur un axe.
 - **Bruit, flou, biais de champ : non calibrés.** `site_summary.csv` ne contient aucune mesure de ces grandeurs. Les valeurs sont des ordres de grandeur usuels. Le biais par défaut donne un champ d'environ 0,82 à 1,26 dans le cerveau (mesuré sur volume synthétique).
 
-> **À recalibrer.** Ces plages sont calculées sur tous les centres, y compris les futurs centres de test. Dès que `splits.json` est fixé, il faut les recalculer sur les seuls centres d'entraînement, sinon le test OOD n'est plus honnête. La borne basse du gamma vient d'ailleurs de R032, un centre aujourd'hui exclu ; sans lui elle vaut 0,74 (R040).
+### `beta` de FDA : 0,015 à 0,03, re-balayé sur les sujets d'entraînement
 
-### `beta` de FDA : 0,015 à 0,03, réglé sur les données réelles
+Le demi-côté du cube de fréquences échangé vaut `b = floor(beta × plus petit côté)`. Mesure du 3 novembre 2026 sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) et 4 images de référence de R059, toutes d'entraînement, soit 24 paires par valeur :
 
-Le demi-côté du cube de fréquences échangé vaut `b = floor(beta × plus petit côté)`. Mesure du 14 octobre 2026 sur 6 sujets (SOOP, R029, R014, R008, R039, R040) et 4 images de référence de R009, soit 24 paires par valeur :
+```powershell
+.venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --fda-betas 0.01 0.015 0.02 0.03 0.04 0.05 0.06 0.08 0.12 --fda-references 4 --out generalization\figures\recal_fda
+```
 
 | `beta` | `b` | Changement médian de l'image (écarts-types du cerveau) | Contraste conservé, minimum |
 |---|---|---|---|
-| 0,01 | 1 | 0,04 | 0,97 |
-| 0,015 | 2 | 0,13 | 0,77 |
-| 0,02 | 2 – 3 | 0,16 | 0,69 |
-| 0,03 | 4 – 5 | 0,19 | 0,63 |
-| 0,04 | 5 – 7 | 0,23 | 0,54 |
-| 0,05 | 7 – 9 | 0,26 | 0,63 |
-| 0,06 | 8 – 11 | 0,28 | 0,42 |
-| 0,08 | 11 – 15 | 0,32 | 0,27 |
-| 0,12 | 17 – 23 | 0,37 | 0,35 |
+| 0,01 | 1 | 0,10 | 0,89 |
+| 0,015 | 2 | 0,18 | 0,76 |
+| 0,02 | 2 – 3 | 0,21 | 0,74 |
+| 0,03 | 4 – 5 | 0,23 | 0,73 |
+| 0,04 | 5 – 7 | 0,28 | 0,66 |
+| 0,05 | 7 – 9 | 0,29 | 0,62 |
+| 0,06 | 8 – 11 | 0,31 | 0,56 |
+| 0,08 | 11 – 15 | 0,33 | 0,55 |
+| 0,12 | 17 – 23 | 0,38 | 0,51 |
 
-- **Borne basse 0,015.** En dessous, `b` vaut 0 ou 1 : l'image ne change presque pas (0,04 écart-type), et quand `b` vaut 0 elle ne change pas du tout. Avec l'ancienne plage de 0 à 0,03, 35 à 46 % des tirages tombaient dans ce cas, selon la taille du volume.
-- **Borne haute 0,03.** Jusque-là, la carte de différence est un ombrage lisse à l'échelle de plusieurs centimètres : c'est bien le « style » du scanner. À partir de 0,05, elle montre des taches de 1 à 2 cm, la taille des lésions. Au-delà, le contraste conservé passe sous la moitié : 0,42 pour `beta` = 0,06 et 0,27 pour 0,08, les deux à R008.
-- **Marge.** À 0,03, le pire cas (0,63, à R008) reste au-dessus de celui du flou (0,55, à R014), un effet déjà accepté.
+Les minima viennent de R029 jusqu'à 0,04, puis de R015.
 
-Limites : un seul centre de référence (R009), six sujets, volumes entiers dont le plus petit côté fait 144 à 192 voxels. Sur des patchs de 128³, la même plage donne `b` de 1 à 3. Le réglage est à refaire si le centre de référence change :
+- **Borne basse 0,015 (inchangée).** En dessous, `b` vaut 0 ou 1 et l'image change peu ; quand `b` vaut 0, elle ne change pas du tout. À 0,015, `b` vaut 2 sur tous les volumes.
+- **Borne haute 0,03 (inchangée).** Jusque-là, la carte de différence est un ombrage lisse à l'échelle de 3 à 5 cm : c'est bien le « style » du scanner. À partir de 0,05, elle montre des taches de 1 à 2 cm, la taille des lésions. Ce critère d'échelle ne dépend pas des centres : `b` reste sous le trentième du plus petit côté.
+- **Ce qui change par rapport au 14 octobre.** Sans R008, aucune valeur ne fait passer le contraste conservé sous la moitié (0,51 au pire, à 0,12) : c'est le critère d'échelle qui fixe seul la borne haute. À 0,03, le pire cas vaut 0,73 au lieu de 0,63.
+- **Marge.** À 0,03, le pire cas (0,73) reste au-dessus de celui du flou sur les mêmes sujets (0,55, à R014), un effet déjà accepté.
+
+Limites : un seul centre de référence, six sujets, volumes entiers dont le plus petit côté fait 144 à 192 voxels. Sur des patchs de 128³ ou des volumes recadrés (C1), la même plage donne des `b` plus petits (1 à 3). Le réglage est à refaire si le centre de référence ou la taille des volumes change.
+
+Ancien balayage (14 octobre, avec SOOP et R008 et des références de R009) : même plage retenue, contraste conservé minimal de 0,63 à 0,03 et 0,27 à 0,08 (R008).
+
+### Gamma du preset BigAug : 0,71 à 1,77 au lieu de 0,5 à 4,5
+
+Re-balayé le 3 novembre 2026 sur un sujet d'entraînement de six centres : R015 (0,5 mm anisotrope, à la place de SOOP), R029, R014, R030 (le centre le plus sombre, à la place de R008), R039 et R040.
 
 ```powershell
-.venv-dl\Scripts\python -m generalization.visual_check --sites SOOP R029 R014 R008 R039 R040 --fda-betas 0.01 0.015 0.02 0.03 0.04 0.05 0.06 0.08 0.12 --fda-references 4 --out generalization\figures\raw_fda
+.venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --gammas 0.5 0.6 0.71 0.85 1.0 1.4 1.77 1.85 2.5 3.5 4.5 --out generalization\figures\recal_gamma
 ```
 
-### Gamma du preset BigAug : 0,7 à 1,85 au lieu de 0,5 à 4,5
+Part du cerveau écrasée au noir (sous 5 % de l'échelle [minimum, p99] du cerveau) :
 
-Part du cerveau écrasée au noir (sous 5 % de l'échelle d'intensité), mesurée sur un sujet de six centres :
+| Gamma | 1 | 1,77 | 2,5 | 3,5 | 4,5 |
+|---|---|---|---|---|---|
+| R015, R029, R014, R039, R040 | 0 à 0,6 % | 1 à 5 % | 10 à 13 % | 18 à 22 % | 26 à 32 % |
+| R030 | 8 % | 32 % | 48 % | 61 % | 70 % |
 
-| Gamma | 1,85 | 2,5 | 3,5 | 4,5 |
-|---|---|---|---|---|
-| SOOP, R029, R009, R014, R039 | 2 à 7 % | 10 à 18 % | 18 à 31 % | 26 à 40 % |
-| R008 | 8 % | 22 % | 55 % | 82 % |
+Contraste de la lésion conservé : 0,51 à 0,59 pour un gamma de 0,5, 0,72 à 0,78 pour 0,71 ; au-dessus de 1, la lésion sombre s'assombrit encore et le contraste augmente.
 
-Au-delà de 2,5, la substance grise disparaît ; à R008, tout le cerveau devient noir et la lésion avec lui. À l'autre bout, un gamma de 0,5 divise par deux le contraste des lésions peu visibles (R008 : L/V 0,94 → 0,97). Le preset reprend donc la plage calibrée de `intensity.yaml`.
+Au-delà de 2,5, la substance grise disparaît. R030 est déjà sombre (8 % au noir sans transformation, surtout la grande lésion et les ventricules) ; à 1,77, sa substance grise reste visible, à 3,5 il ne reste que la substance blanche. Un gamma de 0,5 divise par deux le contraste de toutes les lésions. Le preset reprend donc la plage calibrée de `intensity.yaml`, comme au premier réglage.
+
+Ancien balayage (14 octobre, avec SOOP et R008, centres de test) : 2 à 7 % au noir à 1,85, 26 à 40 % à 4,5, et 82 % à R008.
 
 ### Centre de référence
 
-Le centre de référence de FDA et de l'histogram matching est le paramètre `reference_sites` des configurations, jamais une valeur du code. Il vaut `[R009]` à titre provisoire : il devra être pris parmi les centres d'entraînement.
+Le centre de référence de FDA et de l'histogram matching est le paramètre `reference_sites` des configurations, jamais une valeur du code. Il vaut **`[R059]`**, choisi par `calibration.py` parmi les centres d'entraînement :
+
+- **Critères** : au moins 20 sujets d'entraînement, 1 mm isotrope (pas de rééchantillonnage) et au moins 200 niveaux de gris dans le cerveau. Ce dernier critère écarte R029 et son histogramme en peigne (73 niveaux) ; le centre suivant en a 242.
+- **Choix** : la plus petite distance W1 entre l'histogramme moyen du centre (intensité / p99) et celui du reste du pool d'entraînement. Un centre « typique » déforme le moins les images qu'on harmonise vers lui.
+- **Classement** : R059 (0,009), R071 (0,010), R010 (0,016), R004 (0,018), R011 (0,021), R052 (0,022), R001 (0,032), R009 (0,036). R009, la référence provisoire, n'arrive qu'en 8e position.
+- **Seuls les sujets d'entraînement de R059 servent de référence**, jamais ceux du test ID : la clé `splits: splits.json` des entrées `fda` et `histogram_matching` le garantit et refuse un centre de test à la construction.
+
+> **Limite : les plis de validation.** Chaque centre d'entraînement est un centre de validation dans un des 5 plis ; R059 l'est dans le pli 3. Pour ce pli, des images du centre de validation servent de référence, ce qui rend sa validation un peu optimiste. Si cela compte (choix d'hyperparamètres sur le pli 3), passer un autre `reference_sites` pour ce pli : R010, troisième du classement, qui est un centre de validation du pli 0 (R071, deuxième, est lui aussi dans le pli 3).
 
 ## Vérification
 
 ### Tests
 
-`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 138 tests, environ 20 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
+`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 155 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
 
 - **Invariants de chaque transformation d'intensité**, sur un volume isotrope, un volume anisotrope 0,5 × 0,47 × 0,47 mm et un volume de type R029 : masque et cerveau identiques, forme et affine conservées, pas de NaN ni d'infini, fond intact, entrée non modifiée.
 - **Reproductibilité** avec une graine fixée, et identité avec `p = 0`.
 - **Comportement propre** : gamma monotone avec des valeurs négatives, FDA à `beta = 0` égal à l'original, phase conservée par FDA, histogrammes rapprochés par l'histogram matching.
 - **Chargement** : LAS et PSR réorientés en RAS, 1 mm, volume du cerveau conservé, grille gardée pour un volume déjà à 1 mm, masque 0,99999998, fond de R029, masque vide signalé, exclusion de R032, z-score.
 - **Configurations et adaptateur MONAI** : chaque YAML se construit et s'applique, les transformations sont sérialisables pour les `DataLoader`.
+- **Aucun centre de test dans les réglages** (`test_calibration.py`) : centres de référence des YAML, centres utilisés par `calibration.json` et ses balayages, empreinte de `splits.json`, accord entre les YAML et `calibration.json`, refus d'un centre OOD par `check_training_sites`, `build_transforms` et `visual_check`, et références prises hors du test ID.
 
 ### Vérification visuelle
 
 ```powershell
 .venv-dl\Scripts\python -m generalization.visual_check --synthetic
-.venv-dl\Scripts\python -m generalization.visual_check --sites SOOP R029 R009 R014
-.venv-dl\Scripts\python -m generalization.visual_check --sites R008 R039 --out generalization\figures\raw_r008_r039
+.venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --out generalization\figures\recal_familles
 ```
+
+Sur données réelles, seuls les sujets d'entraînement de `splits.json` sont candidats (le premier du centre qui a une lésion) ; un centre de test est refusé, sauf avec `--include-held-out`.
 
 Le script écrit une figure par famille et par sujet : coupe axiale où la lésion est la plus grande, contour de la lésion, original puis 4 tirages. Il écrit aussi `contraste_lesion.csv` (une ligne par tirage), `resume.csv` et `conserve_min_par_centre.csv`. Tout va dans `generalization\figures\`, ignoré par Git parce que les figures réelles montrent des coupes de patients.
 
 Le **rapport L/V** est la médiane de l'intensité dans la lésion divisée par celle d'une couronne de 3 voxels autour, comme `lesion_vs_shell` de l'exploration. Le **contraste conservé** vaut `(1 − L/V après) / (1 − L/V avant)` : 1 s'il est inchangé, 0 si la lésion devient invisible, négatif si elle devient plus claire que son voisinage.
 
-#### Résultat sur les données réelles (14 octobre 2026)
+#### Résultat sur les sujets d'entraînement (3 novembre 2026, réglages recalibrés)
 
-Un sujet par centre (le premier qui a une lésion), 10 tirages par transformation. Contraste conservé **minimal** :
+Un sujet d'entraînement par centre (le premier qui a une lésion), 10 tirages par transformation, référence R059. Contraste conservé **minimal** :
 
-| Transformation | SOOP | R029 | R009 | R014 | R008 | R039 |
+| Transformation | R015 | R029 | R014 | R030 | R039 | R040 |
 |---|---|---|---|---|---|---|
-| *L/V d'origine* | *0,82* | *0,84* | *0,79* | *0,91* | *0,94* | *0,90* |
-| `gamma` | 0,78 | 0,78 | 0,78 | 0,77 | 0,77 | 0,77 |
-| `contrast` | 0,85 | 0,86 | 0,86 | 0,87 | 0,84 | 0,87 |
-| `noise` | 0,99 | 0,83 | 1,00 | 0,95 | 0,96 | 0,99 |
-| `blur` | 0,92 | 0,74 | 0,81 | 0,55 | 0,87 | 0,74 |
-| `bias_field` | 0,91 | 0,78 | 0,91 | 0,85 | 0,94 | 1,00 |
-| `low_resolution` | 0,90 | 0,74 | 0,84 | 0,58 | 0,86 | 0,72 |
-| `randconv` | 0,76 | 0,74 | 0,82 | 0,77 | 0,74 | 0,71 |
-| `gin` | 0,78 | 0,70 | 0,69 | 0,74 | 0,74 | 0,89 |
-| `fda` (`beta` 0,015 – 0,03) | 0,97 | 0,72 | 0,93 | 0,81 | 0,75 | 1,10 |
-| `histogram_matching` | 0,77 | 1,07 | 0,98 | 1,09 | 1,20 | 0,89 |
-| preset `bigaug` (gamma 0,7 – 1,85) | 0,77 | 0,64 | 0,71 | 0,55 | 0,67 | 0,68 |
+| *L/V d'origine* | *0,57* | *0,84* | *0,91* | *0,50* | *0,90* | *0,69* |
+| `gamma` (0,71 – 1,77) | 0,82 | 0,79 | 0,78 | 0,83 | 0,78 | 0,80 |
+| `contrast` (0,78 – 1,52) | 0,83 | 0,86 | 0,87 | 0,84 | 0,87 | 0,86 |
+| `noise` | 0,98 | 0,83 | 0,95 | 0,99 | 0,99 | 0,97 |
+| `blur` | 0,87 | 0,74 | 0,55 | 0,79 | 0,74 | 0,59 |
+| `bias_field` | 0,96 | 0,78 | 0,85 | 0,97 | 1,00 | 0,97 |
+| `low_resolution` | 0,88 | 0,74 | 0,58 | 0,80 | 0,72 | 0,63 |
+| `randconv` | 0,86 | 0,74 | 0,77 | 0,82 | 0,71 | 0,66 |
+| `gin` | 0,78 | 0,70 | 0,74 | 0,75 | 0,89 | 0,73 |
+| `fda` (`beta` 0,015 – 0,03) | 0,71 | 0,72 | 0,88 | 0,79 | 1,01 | 0,91 |
+| `histogram_matching` | 0,91 | 1,19 | 1,10 | 0,84 | 0,95 | 1,18 |
+| preset `bigaug` (gamma 0,71 – 1,77) | 0,77 | 0,64 | 0,55 | 0,65 | 0,68 | 0,49 |
 
-Avec les réglages actuels, aucune transformation n'efface ni n'inverse la lésion : le minimum est 0,55, atteint par le flou et par le preset BigAug à R014, sur une lésion de moins de 0,1 mL. Sur les 606 tirages, aucune transformation d'intensité n'a modifié un masque. Lecture des figures, famille par famille :
+Aucune transformation d'intensité n'efface ni n'inverse la lésion : le minimum est 0,55, atteint par le flou à R014, sur une lésion de moins de 0,1 mL, comme au premier réglage. Sur les 606 tirages, aucune transformation d'intensité n'a modifié un masque ; les 24 masques modifiés viennent de la transformation affine de BigAug, qui déplace aussi le masque. Le seul tirage sous 0,5 est un tirage BigAug à R040 (0,49), qui combine transformation affine et flou sur une petite lésion : elle reste visible sur la figure. Lecture des figures regardées :
 
-- **Intensité** : anatomie et lésion intactes sur les six centres. Le flou et la basse résolution atténuent les petites lésions, ce qui est leur effet physique.
-- **Style** : anatomie et lésion intactes. Certains tirages laissent un liseré clair au bord du cerveau (effet de bord des convolutions).
-- **Fourier** : l'ombrage change à grande échelle, l'anatomie et la lésion restent en place.
-- **Harmonisation** : l'histogramme après traitement se superpose à la référence. À R008, dont l'histogramme est très différent, le contraste de l'image change nettement. À R029, l'histogramme reste en peigne.
-- **BigAug** : l'anatomie reste lisible après réduction du gamma. Avec le gamma de l'article, les tirages à fort gamma écrasaient la substance grise, et à R008 le cerveau devenait presque entièrement noir.
+- **Style (R029)** : anatomie et lésion intactes ; un tirage RandConv laisse un liseré clair au bord du cerveau (effet de bord des convolutions), comme au premier réglage.
+- **Harmonisation (R030 vers R059)** : l'histogramme après traitement se superpose à la référence et la lésion reste visible. L'histogramme de R059 est discret (environ 300 niveaux de gris dans le cerveau), d'où des dents de scie sur la courbe ; l'image n'en montre aucune trace.
+- **BigAug (R040)** : anatomie lisible sur les 4 tirages affichés, lésion en place.
+- **Gamma et FDA** : voir les balayages ci-dessus.
 
 Trois limites :
 
 - **Un seul sujet par centre.** Ces minima ne sont pas des statistiques de centre.
-- **Colonne R009.** R009 est le centre de référence de FDA et de l'histogram matching : cette colonne mesure un échange à l'intérieur du même centre.
+- **Figures regardées une par une** pour les cas extrêmes seulement (R030, R029, R040, R015) ; les autres figures sont dans `generalization\figures\recal_familles\`.
 - **Le rapport L/V suppose un zéro d'intensité fixe.** Il n'a plus de sens quand une transformation décale les intensités (luminosité de BigAug) ou écrase l'image : c'est ce qui donnait des valeurs aberrantes à R008 avant le réglage. Pour BigAug, les figures priment.
 
 ### Temps CPU
@@ -258,10 +301,12 @@ Vérifié le 14 octobre 2026 sur les données réelles :
 - les 1 416 sujets se chargent sans erreur ni avertissement. Les seuls masques vides sont les 5 connus, et les 48 lésions de moins de 0,1 mL de l'exploration sont retrouvées. Aucune lésion n'est perdue au rééchantillonnage : 914 volumes déjà à 1 mm gardent leur grille, 502 sont rééchantillonnés. Pour ceux-ci, le volume du cerveau change de 1,5 % au plus et celui des lésions de plus de 1 mL de 0,7 % en médiane ; les très petites lésions sont les plus touchées (0,071 → 0,053 mL pour `sub-r050s012`) ;
 - les six centres ci-dessus ont été regardés, et le `beta` de FDA réglé.
 
+Fait le 3 novembre 2026 : recalibrage sur les seuls sujets d'entraînement de `splits.json` (voir [Calibrage](#calibrage)).
+
 Reste :
 
-1. **Étendre la vérification visuelle** à plusieurs sujets par centre et aux centres non regardés, avant les premiers entraînements.
-2. **Recalibrer après `splits.json`** : plages de gamma et de contraste, `reference_sites` et `beta` de FDA, sur les seuls centres d'entraînement.
+1. **Étendre la vérification visuelle** à plusieurs sujets par centre et aux centres d'entraînement non regardés, avant les premiers entraînements.
+2. **Refaire le calibrage si `splits.json` change** : `test_calibration.py` le signale par l'empreinte du fichier. Relancer `python -m generalization.calibration`, puis les deux balayages, et reporter les plages dans les YAML et dans les sections `fda_beta` et `bigaug_gamma` de `calibration.json`.
 3. **Accélérer le chargement.** `load_subject` prend 1,2 s en médiane, mais 6,7 s pour SOOP et jusqu'à 28 s : certains volumes SOOP natifs sont à 0,25 mm (354 millions de voxels pour `sub-soop0430`). Trois chargements en parallèle ont une fois épuisé les 16 Go de mémoire de la machine. Le prétraitement C1 réglera ce point ; d'ici là, un cache local des volumes à 1 mm est à prévoir pour l'entraînement.
 4. **Vérifier les valeurs de BigAug** dans l'article.
 

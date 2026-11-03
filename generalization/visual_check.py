@@ -5,7 +5,10 @@ Pour quelques sujets de centres différents, écrit une figure par famille de tr
 lésion / tissu voisin avant et après chaque tirage (`contraste_lesion.csv`).
 
     .venv-dl\\Scripts\\python -m generalization.visual_check --synthetic
-    .venv-dl\\Scripts\\python -m generalization.visual_check --sites SOOP R029 R009 R014
+    .venv-dl\\Scripts\\python -m generalization.visual_check --sites R015 R029 R059 R014
+
+Sur données réelles, seuls les sujets d'entraînement de splits.json sont utilisés : un centre de test
+OOD ou exclu est refusé, parce que ces mesures servent à régler les transformations.
 """
 import argparse
 import tempfile
@@ -20,10 +23,12 @@ import numpy as np
 import pandas as pd
 import torch
 
+from .calibration import DEFAULT_SPLITS, check_training_sites, load_splits, restrict_to_training
 from .contrast import subject_ratio
 from .data_raw import DEFAULT_ROOT, list_subjects, load_subject
 from .synthetic import write_synthetic_dataset
-from .transforms import FDA, build_transforms, load_config
+from .transforms import FDA, RandomBrainGamma, build_transforms, load_config
+from .transforms.base import unit_range
 
 HERE = Path(__file__).resolve().parent
 CONFIGS = HERE / "configs"
@@ -37,6 +42,8 @@ FAMILIES = {
 }
 DETERMINISTIC = {"histogram_matching"}
 SYNTHETIC_FOV_MM = (120.0, 144.0, 112.0)
+SYNTHETIC_REFERENCE = ["R009"]  # seul centre de référence possible dans le jeu synthétique
+BLACK_LEVEL = 0.05  # part de l'échelle [min, p99] du cerveau sous laquelle un voxel est « au noir »
 
 # Même palette que exploration/02_figures.py.
 SURFACE, INK, INK2, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#898781", "#e1e0d9"
@@ -51,12 +58,16 @@ plt.rcParams.update({
 })
 
 
-def build_rows(family, data_root, reference_sites):
+def build_rows(family, data_root, reference_sites, synthetic=False):
     """Liste (nom, transformation) : une ligne de figure par transformation, forcée à p = 1."""
     configs, whole_preset = FAMILIES[family]
     entries = [dict(entry) for name in configs for entry in load_config(CONFIGS / name).get("transforms") or []]
     for entry in entries:
-        if reference_sites and "reference_sites" in entry:
+        if synthetic and "reference_sites" in entry:
+            # Les volumes synthétiques ne sont pas dans splits.json.
+            entry.pop("splits", None)
+            entry["reference_sites"] = list(reference_sites or SYNTHETIC_REFERENCE)
+        elif reference_sites and "reference_sites" in entry:
             entry["reference_sites"] = list(reference_sites)
     if whole_preset:
         return [(f"{family} (preset complet)", build_transforms({"transforms": entries}, data_root))]
@@ -252,9 +263,50 @@ def check_fda_betas(subject, bank, betas, n_references, out_dir):
     return records
 
 
-def select_records(data_root, sites, subjects):
-    """Un sujet par centre demandé : celui nommé dans `subjects`, sinon le premier avec une lésion."""
+def check_gammas(subject, gammas, out_dir):
+    """Balayage du gamma : part du cerveau mise au noir et contraste conservé, pour des valeurs fixes.
+
+    « Au noir » = sous 5 % de l'échelle [minimum, p99] du cerveau d'origine, celle du gamma.
+    """
+    data, brain = subject["t1"].data, subject["brain"].data.bool()
+    lo, hi = unit_range(data, brain)
+    ratio_before = subject_ratio(subject)
+    window = tuple(np.percentile(data[brain].numpy(), [0.5, 99.5]))
+    box = brain_box(subject)
+    spacing = subject["t1"].spacing
+    aspect = spacing[1] / spacing[0]
+    original = axial_view(subject, window, box)
+    height = original[0].shape[0] * spacing[1] / (original[0].shape[1] * spacing[0])
+    fig, axes = plt.subplots(1, 1 + len(gammas), figsize=(2.3 * (1 + len(gammas)), 2.3 * height + 1.0),
+                             squeeze=False, layout="constrained")
+    show(axes[0, 0], *original, window, aspect, f"original · L/V {ratio_before:.2f}")
+    records = []
+    for column, gamma in enumerate(gammas, start=1):
+        out = RandomBrainGamma(gamma=(gamma, gamma), p=1.0)(subject)
+        unit = (out["t1"].data[brain] - lo) / (hi - lo)
+        ratio_after = subject_ratio(out)
+        record = dict(site=subject["site"], subject=subject["subject"], gamma=gamma,
+                      black=float((unit < BLACK_LEVEL).float().mean()), ratio_before=ratio_before,
+                      ratio_after=ratio_after, kept=(1 - ratio_after) / (1 - ratio_before))
+        records.append(record)
+        show(axes[0, column], *axial_view(out, window, box), window, aspect,
+             f"γ = {gamma:g} · noir {record['black']:.0%} · L/V {ratio_after:.2f}")
+    fig.suptitle(f"balayage du gamma — {subject['site']} · {subject['subject']}", x=0.01, ha="left", fontsize=10)
+    path = out_dir / f"gamma__{subject['site']}_{subject['subject']}.png"
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    print(f"  {path}")
+    return records
+
+
+def select_records(data_root, sites, subjects, splits=None):
+    """Un sujet par centre demandé : celui nommé dans `subjects`, sinon le premier avec une lésion.
+
+    Avec `splits`, seuls les sujets d'entraînement sont candidats.
+    """
     table = list_subjects(data_root)
+    if splits is not None:
+        table = restrict_to_training(table, splits)
     table = table[~table["known_empty_mask"]]
     chosen = []
     for site in sites:
@@ -273,7 +325,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="racine des données brutes")
     parser.add_argument("--synthetic", action="store_true", help="volumes synthétiques au lieu des données réelles")
-    parser.add_argument("--sites", nargs="+", default=["SOOP", "R029", "R009", "R014"], help="un sujet par centre")
+    parser.add_argument("--sites", nargs="+", default=["R015", "R029", "R059", "R014"], help="un sujet par centre")
+    parser.add_argument("--splits", type=Path, default=DEFAULT_SPLITS,
+                        help="splits.json : seuls ses sujets d'entraînement sont utilisés (données réelles)")
+    parser.add_argument("--include-held-out", action="store_true",
+                        help="autorise les centres de test : à réserver à l'inspection, jamais à un réglage")
     parser.add_argument("--subjects", nargs="*", help="identifiants à préférer (sinon premier sujet du centre)")
     parser.add_argument("--families", nargs="+", default=list(FAMILIES), choices=list(FAMILIES))
     parser.add_argument("--reference-sites", nargs="+", help="remplace `reference_sites` des configs (FDA, histogrammes)")
@@ -284,7 +340,18 @@ def main():
     parser.add_argument("--fda-betas", nargs="+", type=float,
                         help="calibrage de FDA : une figure par sujet avec ces valeurs fixes de beta, à la place des familles")
     parser.add_argument("--fda-references", type=int, default=2, help="images de référence montrées par sujet")
+    parser.add_argument("--gammas", nargs="+", type=float,
+                        help="balayage du gamma : une figure par sujet avec ces valeurs fixes, à la place des familles")
     args = parser.parse_args()
+
+    splits = None
+    if not args.synthetic and not args.include_held_out:
+        splits = load_splits(args.splits)
+        check_training_sites(args.sites, splits, "la vérification visuelle")
+        if args.reference_sites:
+            check_training_sites(args.reference_sites, splits, "les images de référence")
+    elif args.include_held_out:
+        print("Attention : centres de test autorisés. Ces mesures ne doivent servir à aucun réglage.")
 
     out_dir = args.out or HERE / "figures" / ("synthetic" if args.synthetic else "raw")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -296,9 +363,16 @@ def main():
         elif not data_root.is_dir():
             raise SystemExit(f"Données introuvables dans {data_root} : extraire l'archive ATLAS, passer --data-root, "
                              "ou utiliser --synthetic")
-        subjects = [load_subject(record) for record in select_records(data_root, args.sites, args.subjects)]
+        subjects = [load_subject(record) for record in select_records(data_root, args.sites, args.subjects, splits)]
+        if args.gammas:
+            table = pd.DataFrame([record for subject in subjects for record in check_gammas(subject, args.gammas, out_dir)])
+            table.to_csv(out_dir / "gamma.csv", index=False)
+            with pd.option_context("display.width", 200, "display.max_columns", None):
+                print(table.pivot_table(index="gamma", columns="site", values="black").round(3))
+                print(table.pivot_table(index="gamma", columns="site", values="kept").round(2))
+            return
         if args.fda_betas:
-            bank = build_rows("fourier", data_root, args.reference_sites)[0][1][0].references
+            bank = build_rows("fourier", data_root, args.reference_sites, args.synthetic)[0][1][0].references
             records = [record for subject in subjects
                        for record in check_fda_betas(subject, bank, args.fda_betas, args.fda_references, out_dir)]
             table = pd.DataFrame(records)
@@ -310,7 +384,7 @@ def main():
         records = []
         for family in args.families:
             print(f"Famille « {family} »")
-            rows = build_rows(family, data_root, args.reference_sites)
+            rows = build_rows(family, data_root, args.reference_sites, args.synthetic)
             for subject in subjects:
                 records += check_subject(family, rows, subject, out_dir, args.draws, args.stat_draws, args.seed)
     table = pd.DataFrame(records)

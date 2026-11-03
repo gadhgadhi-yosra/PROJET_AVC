@@ -244,9 +244,21 @@ def test_histogram_matching_vers_soi_meme(subjects):
 
 # --- Construction depuis les fichiers YAML ---
 
+def synthetic_config(path):
+    """Config lisible sur le jeu synthétique : centre de référence R009, sans contrôle par splits.json."""
+    entries = []
+    for entry in build_config_entries(path):
+        entry = dict(entry)
+        if "reference_sites" in entry:
+            entry.pop("splits", None)
+            entry["reference_sites"] = ["R009"]
+        entries.append(entry)
+    return {"transforms": entries}
+
+
 @pytest.mark.parametrize("config", sorted(path.name for path in CONFIGS.glob("*.yaml")))
 def test_chaque_config_se_construit_et_s_applique(dataset_root, subjects, config):
-    transform = build_transforms(CONFIGS / config, data_root=dataset_root)
+    transform = build_transforms(synthetic_config(CONFIGS / config), data_root=dataset_root)
     spatial = config == "bigaug.yaml"
     for seed in range(3):
         out = apply(transform, subjects["iso"], seed)
@@ -261,7 +273,7 @@ def test_chaque_config_se_construit_et_s_applique(dataset_root, subjects, config
 def test_serialisable_pour_les_dataloader(dataset_root, subjects, config):
     # Sous Windows, les processus des DataLoader reçoivent la transformation par pickle.
     import pickle
-    transform = build_transforms(CONFIGS / config, data_root=dataset_root)
+    transform = build_transforms(synthetic_config(CONFIGS / config), data_root=dataset_root)
     clone = pickle.loads(pickle.dumps(transform))
     assert torch.equal(apply(clone, subjects["iso"])["t1"].data, apply(transform, subjects["iso"])["t1"].data)
 
@@ -269,7 +281,7 @@ def test_serialisable_pour_les_dataloader(dataset_root, subjects, config):
 def test_toutes_les_probabilites_a_un(dataset_root, subjects):
     # Chaque transformation des configs, forcée à p = 1, laisse le masque intact.
     for path in sorted(CONFIGS.glob("*.yaml")):
-        for entry in build_config_entries(path):
+        for entry in synthetic_config(path)["transforms"]:
             if entry["name"] in ("affine", "elastic", "flip"):
                 continue
             transform = build_transforms({"transforms": [dict(entry, p=1.0, enabled=True)]}, data_root=dataset_root)

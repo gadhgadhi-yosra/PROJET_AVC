@@ -18,7 +18,7 @@ class RandomBrainGamma(BrainIntensityTransform):
     (valeurs négatives à R029, z-score). gamma > 1 assombrit les tissus intermédiaires.
     """
 
-    def __init__(self, gamma=(0.7, 1.85), **kwargs):
+    def __init__(self, gamma=(0.71, 1.77), **kwargs):
         super().__init__(**kwargs)
         self.gamma = tuple(gamma)
 
@@ -31,7 +31,7 @@ class RandomBrainGamma(BrainIntensityTransform):
 class RandomBrainContrast(BrainIntensityTransform):
     """Étire ou resserre les intensités autour de la moyenne du cerveau."""
 
-    def __init__(self, factor=(0.78, 1.56), **kwargs):
+    def __init__(self, factor=(0.78, 1.52), **kwargs):
         super().__init__(**kwargs)
         self.factor = tuple(factor)
 

@@ -3,7 +3,8 @@
 transforms:
   - name: histogram_matching
     p: 1.0
-    # Provisoire : à choisir parmi les centres d'ENTRAÎNEMENT une fois splits.json fixé.
-    reference_sites: [R009]
+    # Centre d'entraînement le plus proche du reste du pool (calibration.json) ; R009 avant splits.json.
+    reference_sites: [R059]
+    splits: splits.json       # refuse un centre de test ; références prises parmi les sujets d'entraînement
     n_references: 20          # sujets moyennés pour l'histogramme de référence
-    # reference_file: generalization/artifacts/histref_R009.pt   # cache local (ignoré par Git)
+    # reference_file: generalization/artifacts/histref_R059.pt   # cache local (ignoré par Git)

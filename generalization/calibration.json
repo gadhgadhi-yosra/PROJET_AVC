@@ -1,0 +1,218 @@
+{
+  "date": "2026-11-03",
+  "splits": {
+    "file": "splits.json",
+    "version": 1,
+    "seed": 2026,
+    "sha256_16": "cc01a2522a90fd55"
+  },
+  "held_out_sites": [
+    "R008",
+    "R028",
+    "R031",
+    "R032",
+    "R034",
+    "R053",
+    "SOOP"
+  ],
+  "training_sites": [
+    "R001",
+    "R002",
+    "R003",
+    "R004",
+    "R005",
+    "R009",
+    "R010",
+    "R011",
+    "R014",
+    "R015",
+    "R016",
+    "R017",
+    "R018",
+    "R019",
+    "R020",
+    "R023",
+    "R024",
+    "R027",
+    "R029",
+    "R030",
+    "R033",
+    "R035",
+    "R038",
+    "R039",
+    "R040",
+    "R041",
+    "R042",
+    "R044",
+    "R045",
+    "R046",
+    "R047",
+    "R048",
+    "R049",
+    "R050",
+    "R052",
+    "R056",
+    "R057",
+    "R058",
+    "R059",
+    "R061",
+    "R062",
+    "R063",
+    "R064",
+    "R065",
+    "R067",
+    "R069",
+    "R070",
+    "R071"
+  ],
+  "n_training_subjects": 917,
+  "gamma": {
+    "range": [
+      0.71,
+      1.77
+    ],
+    "raw": [
+      0.719,
+      1.765
+    ],
+    "sites": [
+      "R014",
+      "R030"
+    ],
+    "position_median": 0.601
+  },
+  "contrast": {
+    "range": [
+      0.78,
+      1.52
+    ],
+    "raw": [
+      0.787,
+      1.519
+    ],
+    "sites": [
+      "R020",
+      "R030"
+    ],
+    "cv_median": 0.409
+  },
+  "reference": {
+    "site": "R059",
+    "criteria": "au moins 20 sujets d'entraînement, 1 mm isotrope, au moins 200 niveaux de gris ; plus petite distance W1 au reste du pool",
+    "ranking": [
+      {
+        "site": "R059",
+        "n": 30,
+        "w1": 0.0091
+      },
+      {
+        "site": "R071",
+        "n": 21,
+        "w1": 0.0101
+      },
+      {
+        "site": "R010",
+        "n": 21,
+        "w1": 0.0159
+      },
+      {
+        "site": "R004",
+        "n": 30,
+        "w1": 0.0181
+      },
+      {
+        "site": "R011",
+        "n": 23,
+        "w1": 0.0205
+      },
+      {
+        "site": "R052",
+        "n": 26,
+        "w1": 0.0223
+      },
+      {
+        "site": "R001",
+        "n": 31,
+        "w1": 0.0324
+      },
+      {
+        "site": "R009",
+        "n": 89,
+        "w1": 0.0357
+      }
+    ]
+  },
+  "fda_beta": {
+    "range": [
+      0.015,
+      0.03
+    ],
+    "previous": [
+      0.015,
+      0.03
+    ],
+    "date": "2026-11-03",
+    "reference_site": "R059",
+    "sweep_sites": [
+      "R015",
+      "R029",
+      "R014",
+      "R030",
+      "R039",
+      "R040"
+    ],
+    "references_per_subject": 4,
+    "betas": [
+      0.01,
+      0.015,
+      0.02,
+      0.03,
+      0.04,
+      0.05,
+      0.06,
+      0.08,
+      0.12
+    ],
+    "criteria": "borne basse : demi-côté b >= 2 sur tous les volumes (sinon changement négligeable) ; borne haute : ombrage à l'échelle de plusieurs centimètres, sans taches de la taille d'une lésion (visibles dès 0,05), et contraste conservé minimal >= 0,7",
+    "kept_min": {
+      "0.015": 0.76,
+      "0.03": 0.73,
+      "0.04": 0.66,
+      "0.05": 0.62,
+      "0.12": 0.51
+    }
+  },
+  "bigaug_gamma": {
+    "range": [
+      0.71,
+      1.77
+    ],
+    "previous": [
+      0.7,
+      1.85
+    ],
+    "date": "2026-11-03",
+    "sweep_sites": [
+      "R015",
+      "R029",
+      "R014",
+      "R030",
+      "R039",
+      "R040"
+    ],
+    "gammas": [
+      0.5,
+      0.6,
+      0.71,
+      0.85,
+      1.0,
+      1.4,
+      1.77,
+      1.85,
+      2.5,
+      3.5,
+      4.5
+    ],
+    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 10 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux"
+  }
+}
