@@ -216,7 +216,7 @@ transform = build_transforms("generalization/configs/fda.yaml", fold=3)   # réf
 final = build_transforms("generalization/configs/fda.yaml")               # référence R059, tous les sujets d'entraînement
 ```
 
-Les références par pli sont dans la clé `fold_reference_sites` des entrées `fda` et `histogram_matching`, et dans la section `fold_references` de `calibration.json`. Avec `fold=k`, `build_transforms` refuse un centre de validation du pli k ou un centre de test, et ne prend comme images de référence que des sujets d'entraînement du pli k. Le cache `reference_file` de l'histogram matching reçoit le suffixe `_pliK`. Le choix d'une référence différente selon le pli ajoute un peu de variabilité entre plis ; c'est le prix d'une validation honnête.
+Les références par pli sont dans la clé `fold_reference_sites` des entrées `fda` et `histogram_matching`, et dans la section `fold_references` de `calibration.json`. Avec `fold=k`, `build_transforms` refuse un centre de validation du pli k ou un centre de test, et ne prend comme images de référence que des sujets d'entraînement du pli k. Le cache `reference_file` de l'histogram matching reçoit le suffixe `_pliK`. **Cette variabilité entre plis est voulue.** Une référence différente selon le pli fait un peu varier les résultats d'un pli à l'autre, mais chaque pli applique la procédure complète sans voir sa validation : l'écart entre plis mesure aussi la sensibilité au choix de la référence, ce qu'une référence fixe cacherait. Ne pas la remplacer par une référence unique pour « stabiliser » les plis.
 
 ## Vérification
 
