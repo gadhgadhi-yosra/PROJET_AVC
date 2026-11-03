@@ -5,6 +5,8 @@ transforms:
     p: 1.0
     # Centre d'entraînement le plus proche du reste du pool (calibration.json) ; R009 avant splits.json.
     reference_sites: [R059]
+    # build_transforms(config, fold=k) : référence du pli k, choisie hors de ses centres de validation.
+    fold_reference_sites: [R059, R071, R059, R010, R071]
     splits: splits.json       # refuse un centre de test ; références prises parmi les sujets d'entraînement
     n_references: 20          # sujets moyennés pour l'histogramme de référence
-    # reference_file: generalization/artifacts/histref_R059.pt   # cache local (ignoré par Git)
+    # reference_file: generalization/artifacts/histref.pt   # cache local (ignoré par Git), suffixe _pliK par pli

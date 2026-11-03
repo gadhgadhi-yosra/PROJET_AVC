@@ -4,8 +4,8 @@ Techniques de généralisation de la question RQ3 (§3.5 du document de projet) 
 
 État au 3 novembre 2026 :
 
-- **recalibrage sur les seuls sujets d'entraînement de `splits.json`** : plages de gamma et de contraste, centre de référence R059 au lieu de R009, `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-du-3-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
-- les 155 tests passent sur des volumes synthétiques ;
+- **recalibrage sur les seuls sujets d'entraînement de `splits.json`** : plages de gamma et de contraste, centre de référence R059 au lieu de R009 (et une référence par pli de validation croisée), `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-du-3-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
+- les 167 tests passent sur des volumes synthétiques ;
 - le chargement a été vérifié sur les 1 416 sujets réels (14 octobre) ;
 - les transformations ont été regardées sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) ;
 - deux défauts du chargement ont été corrigés le 14 octobre (lecture de deux masques de R040, rééchantillonnage des volumes déjà à 1 mm).
@@ -63,7 +63,7 @@ transforms:
     std: [0.0, 0.1]
 ```
 
-Pour le tableau d'ablation, plusieurs configurations se combinent : `build_transforms(["…/intensity.yaml", "…/fda.yaml"])`.
+Pour le tableau d'ablation, plusieurs configurations se combinent : `build_transforms(["…/intensity.yaml", "…/fda.yaml"])`. En validation croisée, passer le pli : `build_transforms(config, fold=k)` prend la référence de FDA et de l'histogram matching choisie hors des centres de validation du pli k (voir [Référence pli par pli](#référence-pli-par-pli)).
 
 **Boucle MONAI (contrat C4).** `build_transforms(config, monai=True)` renvoie un objet qui prend et rend un dictionnaire `{"image", "label"}` en canal d'abord, utilisable dans un `monai.transforms.Compose`. Trois points à connaître :
 
@@ -126,7 +126,7 @@ Le premier réglage (14 octobre) avait été fait avant `splits.json`, sur tous 
 |---|---|---|---|
 | `gamma` de `intensity.yaml` | 0,7 – 1,85 | **0,71 – 1,77** | R014 – R030 |
 | `factor` de `contrast` | 0,78 – 1,56 | **0,78 – 1,52** | R020 – R030 |
-| `reference_sites` (FDA, histogram matching) | R009 (provisoire) | **R059** | distance au pool |
+| `reference_sites` (FDA, histogram matching) | R009 (provisoire) | **R059** ; par pli : R059, R071, R059, R010, R071 | distance au pool |
 | `beta` de FDA | 0,015 – 0,03 | **0,015 – 0,03** (inchangé, re-balayé) | balayage |
 | `gamma` du preset BigAug | 0,7 – 1,85 | **0,71 – 1,77** | balayage |
 
@@ -199,20 +199,37 @@ Le centre de référence de FDA et de l'histogram matching est le paramètre `re
 - **Classement** : R059 (0,009), R071 (0,010), R010 (0,016), R004 (0,018), R011 (0,021), R052 (0,022), R001 (0,032), R009 (0,036). R009, la référence provisoire, n'arrive qu'en 8e position.
 - **Seuls les sujets d'entraînement de R059 servent de référence**, jamais ceux du test ID : la clé `splits: splits.json` des entrées `fda` et `histogram_matching` le garantit et refuse un centre de test à la construction.
 
-> **Limite : les plis de validation.** Chaque centre d'entraînement est un centre de validation dans un des 5 plis ; R059 l'est dans le pli 3. Pour ce pli, des images du centre de validation servent de référence, ce qui rend sa validation un peu optimiste. Si cela compte (choix d'hyperparamètres sur le pli 3), passer un autre `reference_sites` pour ce pli : R010, troisième du classement, qui est un centre de validation du pli 0 (R071, deuxième, est lui aussi dans le pli 3).
+#### Référence pli par pli
+
+Chaque centre d'entraînement est un centre de validation dans un des 5 plis ; R059 l'est dans le pli 3. Pour qu'aucun pli ne voie sa validation, la référence est choisie **pli par pli**, avec le même critère, en ne gardant que les sujets d'entraînement du pli : ses centres de validation ne sont ni candidats ni comptés dans le pool qui sert à mesurer la distance.
+
+| Pli | 0 | 1 | 2 | 3 | 4 | Entraînement final |
+|---|---|---|---|---|---|---|
+| Référence | R059 | **R071** | R059 | **R010** | **R071** | R059 |
+| Distance W1 | 0,010 | 0,005 | 0,009 | 0,016 | 0,005 | 0,009 |
+| Deuxième du classement | R071 | R004 | R010 | R004 | R059 | R071 |
+
+R059 est exclu du pli 3, où il sert à la validation. Aux plis 1 et 4, R059 reste autorisé, mais une fois les centres de validation retirés du pool, R071 devient le plus proche. Le choix est refait dans chaque pli au lieu de reprendre le classement global : c'est la même procédure que celle qu'on évalue, appliquée sans voir la validation.
+
+```python
+transform = build_transforms("generalization/configs/fda.yaml", fold=3)   # référence R010, sujets d'entraînement du pli 3
+final = build_transforms("generalization/configs/fda.yaml")               # référence R059, tous les sujets d'entraînement
+```
+
+Les références par pli sont dans la clé `fold_reference_sites` des entrées `fda` et `histogram_matching`, et dans la section `fold_references` de `calibration.json`. Avec `fold=k`, `build_transforms` refuse un centre de validation du pli k ou un centre de test, et ne prend comme images de référence que des sujets d'entraînement du pli k. Le cache `reference_file` de l'histogram matching reçoit le suffixe `_pliK`. Le choix d'une référence différente selon le pli ajoute un peu de variabilité entre plis ; c'est le prix d'une validation honnête.
 
 ## Vérification
 
 ### Tests
 
-`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 155 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
+`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 167 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
 
 - **Invariants de chaque transformation d'intensité**, sur un volume isotrope, un volume anisotrope 0,5 × 0,47 × 0,47 mm et un volume de type R029 : masque et cerveau identiques, forme et affine conservées, pas de NaN ni d'infini, fond intact, entrée non modifiée.
 - **Reproductibilité** avec une graine fixée, et identité avec `p = 0`.
 - **Comportement propre** : gamma monotone avec des valeurs négatives, FDA à `beta = 0` égal à l'original, phase conservée par FDA, histogrammes rapprochés par l'histogram matching.
 - **Chargement** : LAS et PSR réorientés en RAS, 1 mm, volume du cerveau conservé, grille gardée pour un volume déjà à 1 mm, masque 0,99999998, fond de R029, masque vide signalé, exclusion de R032, z-score.
 - **Configurations et adaptateur MONAI** : chaque YAML se construit et s'applique, les transformations sont sérialisables pour les `DataLoader`.
-- **Aucun centre de test dans les réglages** (`test_calibration.py`) : centres de référence des YAML, centres utilisés par `calibration.json` et ses balayages, empreinte de `splits.json`, accord entre les YAML et `calibration.json`, refus d'un centre OOD par `check_training_sites`, `build_transforms` et `visual_check`, et références prises hors du test ID.
+- **Aucun centre de test dans les réglages** (`test_calibration.py`) : centres de référence des YAML, centres utilisés par `calibration.json` et ses balayages, empreinte de `splits.json`, accord entre les YAML et `calibration.json`, refus d'un centre OOD par `check_training_sites`, `build_transforms` et `visual_check`, références prises hors du test ID, et référence de chaque pli hors de ses centres de validation.
 
 ### Vérification visuelle
 

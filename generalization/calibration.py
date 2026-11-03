@@ -47,31 +47,42 @@ def held_out_sites(splits):
     return sorted(set(splits["ood_centers"]) | set(splits.get("excluded_centers", [])))
 
 
-def training_cases(splits):
-    """Table (case_id, subject, site, session) des sujets d'entraînement, sans test ID ni OOD."""
+def training_cases(splits, fold=None):
+    """Table (case_id, subject, site, session) des sujets d'entraînement, sans test ID ni OOD.
+
+    Avec `fold`, seulement la partie entraînement de ce pli (sa validation est retirée).
+    """
     cases = pd.DataFrame(splits["cases"])
-    return cases[cases["case_id"].isin(set(splits["train"]))].reset_index(drop=True)
+    keep = splits["train"] if fold is None else splits["folds"][fold]["train"]
+    return cases[cases["case_id"].isin(set(keep))].reset_index(drop=True)
 
 
-def training_sites(splits):
-    return sorted(training_cases(splits)["site"].unique())
+def training_sites(splits, fold=None):
+    return sorted(training_cases(splits, fold)["site"].unique())
 
 
-def check_training_sites(sites, splits, purpose="un réglage"):
-    """Erreur si un centre n'appartient pas au pool d'entraînement (OOD, exclu ou inconnu)."""
+def check_training_sites(sites, splits, purpose="un réglage", fold=None):
+    """Erreur si un centre n'appartient pas au pool d'entraînement (OOD, exclu ou inconnu).
+
+    Avec `fold`, les centres de validation de ce pli sont aussi interdits.
+    """
     sites = [sites] if isinstance(sites, str) else list(sites)
     held_out = sorted(set(sites) & set(held_out_sites(splits)))
     if held_out:
         raise ValueError(f"Centres de test ou exclus interdits pour {purpose} : {held_out}")
-    unknown = sorted(set(sites) - set(training_sites(splits)))
+    if fold is not None:
+        validation = sorted(set(sites) & set(splits["folds"][fold]["validation_centers"]))
+        if validation:
+            raise ValueError(f"Centres de validation du pli {fold} interdits pour {purpose} : {validation}")
+    unknown = sorted(set(sites) - set(training_sites(splits, fold)))
     if unknown:
         raise ValueError(f"Centres absents du pool d'entraînement de splits.json pour {purpose} : {unknown}")
     return sites
 
 
-def restrict_to_training(records, splits):
-    """Garde les lignes de `list_subjects` qui sont des sujets d'entraînement (même sujet, même session)."""
-    keys = set(zip(*(training_cases(splits)[column] for column in ("site", "subject", "session"))))
+def restrict_to_training(records, splits, fold=None):
+    """Garde les lignes qui sont des sujets d'entraînement (même centre, sujet et session), du pli `fold` si donné."""
+    keys = set(zip(*(training_cases(splits, fold)[column] for column in ("site", "subject", "session"))))
     keep = [key in keys for key in zip(records["site"], records["subject"], records["session"])]
     return records[keep].reset_index(drop=True)
 
@@ -169,6 +180,21 @@ def splits_fingerprint(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
 
 
+def fold_references(stats, splits):
+    """Référence de chaque pli : même critère, sur les seuls sujets d'entraînement du pli.
+
+    Les centres de validation du pli ne sont ni candidats ni dans le pool qui sert à mesurer la distance.
+    """
+    references = []
+    for fold, content in enumerate(splits["folds"]):
+        fold_stats = restrict_to_training(stats, splits, fold)
+        ranking = reference_ranking(fold_stats, site_table(fold_stats, splits))
+        check_training_sites(ranking[0]["site"], splits, f"la référence du pli {fold}", fold)
+        references.append(dict(fold=fold, site=ranking[0]["site"], n_subjects=int(len(fold_stats)),
+                               validation_centers=content["validation_centers"], ranking=ranking[:4]))
+    return references
+
+
 def calibrate(stats, splits, splits_path):
     table = site_table(stats, splits)
     ranking = reference_ranking(stats, table)
@@ -185,6 +211,8 @@ def calibrate(stats, splits, splits_path):
             f"au moins {REFERENCE_MIN_SUBJECTS} sujets d'entraînement, 1 mm isotrope, au moins "
             f"{REFERENCE_MIN_LEVELS} niveaux de gris ; plus petite distance W1 au reste du pool"),
             ranking=ranking[:8]),
+        # build_transforms(config, fold=k) prend fold_references[k] ; `reference` sert à l'entraînement final.
+        "fold_references": fold_references(stats, splits),
     }
 
 
@@ -211,11 +239,13 @@ def main():
     table, result = calibrate(stats, splits, args.splits)
     # Les sections écrites à la main (balayages de FDA et de BigAug) sont conservées.
     previous = json.loads(args.out.read_text(encoding="utf-8")) if args.out.is_file() else {}
-    args.out.write_text(json.dumps({**previous, **result}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with open(args.out, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps({**previous, **result}, ensure_ascii=False, indent=2) + "\n")
     table.to_csv(LOCAL_DIR / "centres_entrainement.csv")
     with pd.option_context("display.width", 200, "display.max_rows", 100):
         print(table.round(3).sort_values("position"))
     print(json.dumps({key: result[key] for key in ("gamma", "contrast", "reference")}, ensure_ascii=False, indent=2))
+    print("Référence par pli :", [reference["site"] for reference in result["fold_references"]])
 
 
 if __name__ == "__main__":
