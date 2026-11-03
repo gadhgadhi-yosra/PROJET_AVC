@@ -7,11 +7,13 @@ matching. Le résultat agrégé par centre va dans `calibration.json` (versionn�
 restent en local, dans `generalization/figures/calibration/` (ignoré par Git).
 
     .venv-dl\\Scripts\\python -m generalization.calibration
+    .venv-dl\\Scripts\\python -m generalization.calibration --source processed   # données du contrat C1
 """
 import argparse
 import hashlib
 import json
 import math
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from datetime import date
 from pathlib import Path
@@ -89,16 +91,10 @@ def restrict_to_training(records, splits, fold=None):
 
 # --- Mesures par sujet ---
 
-def subject_stats(record):
-    """Grandeurs d'intensité d'un sujet brut, définies comme dans exploration/01_compute_stats.py."""
-    image = nib.load(record["t1_path"])
-    data = np.asarray(image.dataobj, dtype=np.float32)
-    if data.ndim > 3:
-        data = data[..., 0]
-    values = data[data > background_value(torch.from_numpy(data))]
+def intensity_stats(record, values, zooms):
+    """Grandeurs d'intensité du cerveau, définies comme dans exploration/01_compute_stats.py."""
     p50, p99 = np.percentile(values, [50, 99])
     histogram, _ = np.histogram(values / p99, bins=HIST_EDGES)
-    zooms = image.header.get_zooms()[:3]
     return dict(site=record["site"], subject=record["subject"], session=record["session"],
                 p50=float(p50), p99=float(p99), cv=float(values.std() / values.mean()),
                 levels=int(np.unique(values[::max(1, values.size // 200_000)]).size),
@@ -106,12 +102,62 @@ def subject_stats(record):
                 **{f"h{index:03d}": value for index, value in enumerate(histogram / values.size)})
 
 
-def compute_stats(records, workers=3):
+def subject_stats(record):
+    """Mesures d'un sujet brut (ligne de `data_raw.list_subjects`)."""
+    image = nib.load(record["t1_path"])
+    data = np.asarray(image.dataobj, dtype=np.float32)
+    if data.ndim > 3:
+        data = data[..., 0]
+    values = data[data > background_value(torch.from_numpy(data))]
+    return intensity_stats(record, values, image.header.get_zooms()[:3])
+
+
+def processed_subject_stats(record):
+    """Mesures d'un sujet prétraité (ligne de `data_processed.list_processed`).
+
+    Les intensités brutes sont reconstruites dans le cerveau de brain.nii.gz par
+    brut = z × raw_std + raw_mean (qc.json) : mêmes grandeurs que sur les données brutes, mais après
+    rééchantillonnage à 1 mm. L'espacement natif vient de `native_voxel_min` / `native_voxel_max`.
+    """
+    from .data_processed import read_image, read_label
+    z = read_image(record["t1_path"])[0][0].numpy()
+    brain = read_label(record["brain_path"])[0][0].numpy().astype(bool)
+    values = z[brain] * record["norm_std"] + record["norm_mean"]
+    return intensity_stats(record, values, (record["native_voxel_min"], record["native_voxel_max"]))
+
+
+def native_spacing(records, data_root):
+    """Ajoute l'espacement natif (en-têtes bruts) aux lignes prétraitées ; NaN si le fichier brut manque.
+
+    Sans lui, le critère « 1 mm isotrope » du centre de référence ne peut pas être évalué.
+    """
+    try:
+        raw = list_subjects(data_root, with_metadata=False).set_index(["site", "subject", "session"])
+    except FileNotFoundError:
+        raw = None
+    voxel_min, voxel_max = [], []
+    for row in records.itertuples():
+        key = (row.site, row.subject, row.session)
+        if raw is not None and key in raw.index:
+            zooms = nib.load(raw.loc[key, "t1_path"]).header.get_zooms()[:3]
+            voxel_min.append(float(min(zooms)))
+            voxel_max.append(float(max(zooms)))
+        else:
+            voxel_min.append(np.nan)
+            voxel_max.append(np.nan)
+    if np.isnan(voxel_min).any():
+        warnings.warn(f"Espacement natif inconnu pour {int(np.isnan(voxel_min).sum())} sujets (données brutes "
+                      f"absentes de {data_root}) : ils ne peuvent pas désigner le centre de référence")
+    return records.assign(native_voxel_min=voxel_min, native_voxel_max=voxel_max)
+
+
+def compute_stats(records, workers=3, source="raw"):
+    function = processed_subject_stats if source == "processed" else subject_stats
     rows = [row for _, row in records.iterrows()]
     if workers <= 1:
-        return pd.DataFrame([subject_stats(row) for row in rows])
+        return pd.DataFrame([function(row) for row in rows])
     with ProcessPoolExecutor(workers) as pool:
-        return pd.DataFrame(list(pool.map(subject_stats, rows, chunksize=4)))
+        return pd.DataFrame(list(pool.map(function, rows, chunksize=4)))
 
 
 # --- Calibrage ---
@@ -173,6 +219,9 @@ def reference_ranking(stats, table):
         outside = stats.loc[stats["site"] != site, columns].to_numpy().mean(axis=0)
         distance = np.abs(np.cumsum(inside) - np.cumsum(outside)).sum() * HIST_WIDTH
         rows.append(dict(site=site, n=int(eligible.loc[site, "n"]), w1=round(float(distance), 4)))
+    if not rows:
+        raise ValueError(f"Aucun centre ne peut servir de référence (au moins {REFERENCE_MIN_SUBJECTS} sujets, "
+                         f"1 mm isotrope connu, au moins {REFERENCE_MIN_LEVELS} niveaux de gris)")
     return sorted(rows, key=lambda row: row["w1"])
 
 
@@ -218,25 +267,37 @@ def calibrate(stats, splits, splits_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument("--source", choices=("raw", "processed"), default="raw",
+                        help="données brutes (défaut) ou prétraitées du contrat C1")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT,
+                        help="données brutes (et, avec --source processed, espacement natif)")
+    parser.add_argument("--processed-root", type=Path, help="données prétraitées (défaut : data/processed)")
     parser.add_argument("--splits", type=Path, default=DEFAULT_SPLITS)
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--out", type=Path, default=CALIBRATION_FILE)
-    parser.add_argument("--stats", type=Path, default=LOCAL_DIR / "stats_entrainement.csv",
-                        help="cache local des mesures par sujet (jamais dans Git)")
+    parser.add_argument("--stats", type=Path, help="cache local des mesures par sujet (jamais dans Git)")
     args = parser.parse_args()
 
     splits = load_splits(args.splits)
-    if args.stats.is_file():
-        stats = pd.read_csv(args.stats)
-        print(f"Mesures relues dans {args.stats}")
+    stats_path = args.stats or LOCAL_DIR / ("stats_entrainement.csv" if args.source == "raw"
+                                            else "stats_entrainement_processed.csv")
+    if stats_path.is_file():
+        stats = pd.read_csv(stats_path)
+        print(f"Mesures relues dans {stats_path}")
     else:
-        records = restrict_to_training(list_subjects(args.data_root, with_metadata=False), splits)
+        if args.source == "processed":
+            from .data_processed import DEFAULT_PROCESSED, list_processed
+            records = list_processed(args.processed_root or DEFAULT_PROCESSED, "train", splits=args.splits,
+                                     on_missing="warn")
+            records = native_spacing(records, args.data_root)
+        else:
+            records = restrict_to_training(list_subjects(args.data_root, with_metadata=False), splits)
         print(f"{len(records)} sujets d'entraînement sur {records['site'].nunique()} centres : mesure en cours…")
-        stats = compute_stats(records, args.workers)
-        args.stats.parent.mkdir(parents=True, exist_ok=True)
-        stats.to_csv(args.stats, index=False)
+        stats = compute_stats(records, args.workers, args.source)
+        stats_path.parent.mkdir(parents=True, exist_ok=True)
+        stats.to_csv(stats_path, index=False)
     table, result = calibrate(stats, splits, args.splits)
+    result["source"] = args.source
     # Les sections écrites à la main (balayages de FDA et de BigAug) sont conservées.
     previous = json.loads(args.out.read_text(encoding="utf-8")) if args.out.is_file() else {}
     with open(args.out, "w", encoding="utf-8", newline="\n") as handle:

@@ -6,6 +6,7 @@ lésion / tissu voisin avant et après chaque tirage (`contraste_lesion.csv`).
 
     .venv-dl\\Scripts\\python -m generalization.visual_check --synthetic
     .venv-dl\\Scripts\\python -m generalization.visual_check --sites R015 R029 R059 R014
+    .venv-dl\\Scripts\\python -m generalization.visual_check --source processed   # données du contrat C1
 
 Sur données réelles, seuls les sujets d'entraînement de splits.json sont utilisés : un centre de test
 OOD ou exclu est refusé, parce que ces mesures servent à régler les transformations.
@@ -25,8 +26,9 @@ import torch
 
 from .calibration import DEFAULT_SPLITS, check_training_sites, load_splits, restrict_to_training
 from .contrast import subject_ratio
+from .data_processed import DEFAULT_PROCESSED, list_processed, load_processed_subject
 from .data_raw import DEFAULT_ROOT, list_subjects, load_subject
-from .synthetic import write_synthetic_dataset
+from .synthetic import write_processed_dataset, write_synthetic_dataset
 from .transforms import FDA, RandomBrainGamma, build_transforms, load_config
 from .transforms.base import unit_range
 
@@ -58,23 +60,26 @@ plt.rcParams.update({
 })
 
 
-def build_rows(family, data_root, reference_sites, synthetic=False):
+def build_rows(family, data_root, reference_sites, synthetic=False, source="raw", synthetic_splits=None):
     """Liste (nom, transformation) : une ligne de figure par transformation, forcée à p = 1."""
     configs, whole_preset = FAMILIES[family]
     entries = [dict(entry) for name in configs for entry in load_config(CONFIGS / name).get("transforms") or []]
     for entry in entries:
         if synthetic and "reference_sites" in entry:
-            # Les volumes synthétiques ne sont pas dans splits.json.
+            # Les volumes synthétiques ne sont pas dans le splits.json du dépôt.
             entry.pop("splits", None)
+            if synthetic_splits:
+                entry["splits"] = str(synthetic_splits)
             entry["reference_sites"] = list(reference_sites or SYNTHETIC_REFERENCE)
         elif reference_sites and "reference_sites" in entry:
             entry["reference_sites"] = list(reference_sites)
+    build = lambda config: build_transforms(config, data_root, source=source)  # noqa: E731
     if whole_preset:
-        return [(f"{family} (preset complet)", build_transforms({"transforms": entries}, data_root))]
+        return [(f"{family} (preset complet)", build({"transforms": entries}))]
     rows = []
     for entry in entries:
         if entry.get("enabled", True):
-            rows.append((entry["name"], build_transforms({"transforms": [dict(entry, p=1.0)]}, data_root)))
+            rows.append((entry["name"], build({"transforms": [dict(entry, p=1.0)]})))
     return rows
 
 
@@ -299,15 +304,23 @@ def check_gammas(subject, gammas, out_dir):
     return records
 
 
-def select_records(data_root, sites, subjects, splits=None):
+def select_records(data_root, sites, subjects, splits=None, source="raw", splits_path=DEFAULT_SPLITS):
     """Un sujet par centre demandé : celui nommé dans `subjects`, sinon le premier avec une lésion.
 
-    Avec `splits`, seuls les sujets d'entraînement sont candidats.
+    Avec `splits`, seuls les sujets d'entraînement sont candidats. Avec `source="processed"`, les
+    sujets viennent de `list_processed` : entraînement seulement, sauf si `splits` vaut None
+    (inspection des centres de test).
     """
-    table = list_subjects(data_root)
-    if splits is not None:
-        table = restrict_to_training(table, splits)
-    table = table[~table["known_empty_mask"]]
+    if source == "processed":
+        parts = ["train"] if splits is not None else ["train", "id_test", "ood_test"]
+        table = pd.concat([list_processed(data_root, part, splits=splits_path, on_missing="warn", sites=sites,
+                                          warn_empty=False) for part in parts], ignore_index=True)
+        table = table[~table["empty_mask"]]
+    else:
+        table = list_subjects(data_root)
+        if splits is not None:
+            table = restrict_to_training(table, splits)
+        table = table[~table["known_empty_mask"]]
     chosen = []
     for site in sites:
         candidates = table[table["site"] == site]
@@ -323,7 +336,10 @@ def select_records(data_root, sites, subjects, splits=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="racine des données brutes")
+    parser.add_argument("--source", choices=("raw", "processed"), default="raw",
+                        help="données brutes (défaut) ou prétraitées du contrat C1")
+    parser.add_argument("--data-root", type=Path,
+                        help="racine des données (défaut : data/ATLAS3_Training_Raw ou data/processed selon --source)")
     parser.add_argument("--synthetic", action="store_true", help="volumes synthétiques au lieu des données réelles")
     parser.add_argument("--sites", nargs="+", default=["R015", "R029", "R059", "R014"], help="un sujet par centre")
     parser.add_argument("--splits", type=Path, default=DEFAULT_SPLITS,
@@ -353,17 +369,27 @@ def main():
     elif args.include_held_out:
         print("Attention : centres de test autorisés. Ces mesures ne doivent servir à aucun réglage.")
 
-    out_dir = args.out or HERE / "figures" / ("synthetic" if args.synthetic else "raw")
+    processed = args.source == "processed"
+    out_dir = args.out or HERE / "figures" / ("synthetic" if args.synthetic else args.source)
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
-        data_root = args.data_root
+        data_root = args.data_root or (DEFAULT_PROCESSED if processed else DEFAULT_ROOT)
+        splits_path, synthetic_splits = args.splits, None
         if args.synthetic:
             print("Génération des volumes synthétiques…")
-            data_root = write_synthetic_dataset(Path(temporary) / "ATLAS3_Training_Raw", fov_mm=SYNTHETIC_FOV_MM)
+            if processed:
+                data_root, synthetic_splits = write_processed_dataset(Path(temporary) / "processed")
+                splits_path, splits = synthetic_splits, load_splits(synthetic_splits)
+            else:
+                data_root = write_synthetic_dataset(Path(temporary) / "ATLAS3_Training_Raw", fov_mm=SYNTHETIC_FOV_MM)
         elif not data_root.is_dir():
-            raise SystemExit(f"Données introuvables dans {data_root} : extraire l'archive ATLAS, passer --data-root, "
+            raise SystemExit(f"Données introuvables dans {data_root} : passer --data-root, prendre l'autre --source, "
                              "ou utiliser --synthetic")
-        subjects = [load_subject(record) for record in select_records(data_root, args.sites, args.subjects, splits)]
+        load = load_processed_subject if processed else load_subject
+        rows_for = lambda family: build_rows(family, data_root, args.reference_sites, args.synthetic,  # noqa: E731
+                                             args.source, synthetic_splits)
+        subjects = [load(record) for record in
+                    select_records(data_root, args.sites, args.subjects, splits, args.source, splits_path)]
         if args.gammas:
             table = pd.DataFrame([record for subject in subjects for record in check_gammas(subject, args.gammas, out_dir)])
             table.to_csv(out_dir / "gamma.csv", index=False)
@@ -372,7 +398,7 @@ def main():
                 print(table.pivot_table(index="gamma", columns="site", values="kept").round(2))
             return
         if args.fda_betas:
-            bank = build_rows("fourier", data_root, args.reference_sites, args.synthetic)[0][1][0].references
+            bank = rows_for("fourier")[0][1][0].references
             records = [record for subject in subjects
                        for record in check_fda_betas(subject, bank, args.fda_betas, args.fda_references, out_dir)]
             table = pd.DataFrame(records)
@@ -384,7 +410,7 @@ def main():
         records = []
         for family in args.families:
             print(f"Famille « {family} »")
-            rows = build_rows(family, data_root, args.reference_sites, args.synthetic)
+            rows = rows_for(family)
             for subject in subjects:
                 records += check_subject(family, rows, subject, out_dir, args.draws, args.stat_draws, args.seed)
     table = pd.DataFrame(records)

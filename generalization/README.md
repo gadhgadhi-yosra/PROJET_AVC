@@ -1,11 +1,12 @@
 # Généralisation inter-centres — bibliothèque de transformations (contrat C5)
 
-Techniques de généralisation de la question RQ3 (§3.5 du document de projet) : augmentation d'intensité, randomisation du style, méthode de Fourier et harmonisation. Tout fonctionne sur les **données brutes** ATLAS v3, en attendant les données prétraitées du contrat C1.
+Techniques de généralisation de la question RQ3 (§3.5 du document de projet) : augmentation d'intensité, randomisation du style, méthode de Fourier et harmonisation. Tout fonctionne sur les **données prétraitées** du contrat C1 (`load_processed`) et, en repli, sur les **données brutes** ATLAS v3 (`data_raw.py`).
 
-État au 3 novembre 2026 :
+État au 4 novembre 2026 :
 
+- **chargeur des données prétraitées C1** (`data_processed.py`), testé sur des volumes synthétiques au format de `preprocessing/week4.py` ; les scripts acceptent `--source raw|processed` ([détail](#données-prétraitées-contrat-c1)) ;
 - **recalibrage sur les seuls sujets d'entraînement de `splits.json`** : plages de gamma et de contraste, centre de référence R059 au lieu de R009 (et une référence par pli de validation croisée), `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-du-3-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
-- les 167 tests passent sur des volumes synthétiques ;
+- les 187 tests passent sur des volumes synthétiques ;
 - le chargement a été vérifié sur les 1 416 sujets réels (14 octobre) ;
 - les transformations ont été regardées sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) ;
 - deux défauts du chargement ont été corrigés le 14 octobre (lecture de deux masques de R040, rééchantillonnage des volumes déjà à 1 mm).
@@ -14,7 +15,8 @@ Ce qui reste à faire est [en fin de document](#reste-à-faire).
 
 | Fichier | Rôle |
 |---|---|
-| `data_raw.py` | Liste et charge les sujets bruts en `torchio.Subject` (RAS, 1 mm, z-score dans le cerveau) |
+| `data_processed.py` | Charge les données prétraitées du contrat C1 en `torchio.Subject`, par découpage et par pli de `splits.json` |
+| `data_raw.py` | Repli : liste et charge les sujets bruts en `torchio.Subject` (RAS, 1 mm, z-score dans le cerveau) |
 | `transforms/` | Les transformations et `build_transforms(config)` |
 | `configs/*.yaml` | Une configuration par famille, plus `baseline.yaml` (aucune transformation) |
 | `contrast.py` | Rapport d'intensité lésion / tissu voisin |
@@ -41,13 +43,21 @@ PyTorch est installé dans sa version CUDA 12.6 (téléchargement d'environ 2,5 
 ## Utilisation
 
 ```python
-from generalization.data_raw import list_subjects, load_subject
+from generalization.data_processed import load_processed
 from generalization.transforms import build_transforms
 
-records = list_subjects("data/ATLAS3_Training_Raw")   # table pandas, centre R032 exclu
-subject = load_subject(records.iloc[0])                # clés : t1, mask, brain, site, subject…
+subjects = load_processed("data/processed", split="train", fold=0)   # torchio.Subject : t1, mask, brain, site…
 transform = build_transforms("generalization/configs/intensity.yaml")
-augmented = transform(subject)                         # le sujet d'entrée n'est pas modifié
+augmented = transform(subjects[0])                                   # le sujet d'entrée n'est pas modifié
+```
+
+Repli sur les données brutes, tant que C1 n'est pas sur la machine :
+
+```python
+from generalization.data_raw import list_subjects, load_subject
+
+records = list_subjects("data/ATLAS3_Training_Raw")   # table pandas, centre R032 exclu
+subject = load_subject(records.iloc[0])                # mêmes clés : t1, mask, brain, site, subject…
 ```
 
 Une configuration est une liste de transformations, chacune avec un nom, une probabilité `p` et ses plages `[min, max]` :
@@ -71,9 +81,32 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 - **Graine.** L'aléa vient du générateur de PyTorch : `torch.manual_seed` ou `monai.utils.set_determinism` suffisent.
 - **Images de référence.** FDA et l'histogram matching lisent leurs images de référence dans `data_root` (argument de `build_transforms`, sinon clé `data_root` de la configuration). Avec la clé `splits: splits.json` de leur entrée, un centre de référence de test est refusé et seuls les sujets d'entraînement servent de référence.
 
-**Passage aux données prétraitées (C1).** Les transformations ne dépendent que du `torchio.Subject` (clés `t1`, `mask`, `brain`). Il suffira d'écrire un chargeur équivalent à `load_subject` pour `data/processed/` ; le reste ne change pas.
+## Données prétraitées (contrat C1)
 
-## Ce que fait le chargement provisoire
+`load_processed(root, split="train", fold=None)` lit la sortie de `preprocessing/week4.py` (Yosra) : `<root>/<sujet>/{t1,mask,brain}.nii.gz`, `qc.json` et la table `<root>/subjects.parquet` (statut `ok` seulement). Elle renvoie une liste de `torchio.Subject` avec les clés `t1`, `mask`, `brain`, `site`, `subject`, `case_id`, `empty_mask`, `norm_mean` et `norm_std`.
+
+- **Découpages** : `split` vaut `"train"`, `"id_test"` ou `"ood_test"` ; avec `fold=k`, `"train"` et `"val"` sont ceux du pli k et `"id_test"` le test ID du pli. `split="val"` sans pli est refusé.
+- **Lecture** : nibabel, à la demande (les volumes ne sont lus qu'à `subject["t1"].data`) ; les sujets sont sérialisables pour les `DataLoader`. Le z-score stocké en int16 avec `scl_slope = 0,001` est relu en float32.
+- **Masques** : lésion seuillée à `> 0.5` ; cerveau lu dans `brain.nii.gz`, jamais déduit de « > 0 » (après z-score, la moitié du cerveau est négative).
+- **Contrôles dès la liste** (en-têtes seulement) : orientation RAS, voxels de 1 mm, même grille pour les trois volumes. Sinon `ProcessedFormatError` avec le sujet et le fichier en cause.
+- **Masques vides** : signalés par un avertissement et gardés comme cas négatifs (`empty_mask`), jamais une erreur.
+- **Sujets manquants** : un sujet du découpage sans volumes est une erreur ; `on_missing="warn"` l'écarte avec un avertissement (utile tant que les 14 sujets en erreur de recadrage du côté C1 ne sont pas traités).
+- **R032** est toujours exclu.
+- **Normalisation réversible** : `norm_mean` et `norm_std` viennent de `qc.json` (`raw_mean`, `raw_std`) : brut = z × `norm_std` + `norm_mean`, comme avec `data_raw`.
+
+`build_transforms(config, source="processed")` prend les images de référence de FDA et de l'histogram matching dans les données C1 (sujets d'entraînement, du pli avec `fold=k`). Les scripts acceptent `--source raw|processed` :
+
+```powershell
+.venv-dl\Scripts\python -m generalization.calibration --source processed   # espacement natif lu dans les données brutes
+.venv-dl\Scripts\python -m generalization.visual_check --source processed --sites R015 R029 R014
+.venv-dl\Scripts\python -m generalization.benchmark --source processed     # volume synthétique au format C1
+```
+
+Avec `--source processed`, la calibration reconstruit les intensités brutes dans le cerveau (brut = z × `raw_std` + `raw_mean`), après rééchantillonnage à 1 mm : les grandeurs sont proches de celles des données brutes, pas identiques. Le critère « 1 mm isotrope » du centre de référence porte sur l'espacement natif, lu dans les en-têtes bruts ; sans données brutes, il ne peut pas être évalué. `calibration.json` note la source (`"source"`). Le calibrage actuel vient des données brutes : le refaire sur C1 changera peut-être légèrement les plages, et les tests signaleront tout écart avec les YAML.
+
+**Pas encore vérifié sur les vraies données C1**, absentes de cette machine : seulement sur des volumes synthétiques écrits comme `week4.py` (même stockage int16, mêmes `qform`/`sform`, même recadrage). À faire dès que l'export de Yosra est disponible : `load_processed` sur tous les sujets, puis la vérification visuelle.
+
+## Ce que fait le chargement provisoire (données brutes)
 
 `load_subject` lit les fichiers avec nibabel, comme l'exploration et le pipeline Spark, puis applique dans l'ordre :
 
@@ -222,13 +255,14 @@ Les références par pli sont dans la clé `fold_reference_sites` des entrées `
 
 ### Tests
 
-`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 167 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
+`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 187 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
 
 - **Invariants de chaque transformation d'intensité**, sur un volume isotrope, un volume anisotrope 0,5 × 0,47 × 0,47 mm et un volume de type R029 : masque et cerveau identiques, forme et affine conservées, pas de NaN ni d'infini, fond intact, entrée non modifiée.
 - **Reproductibilité** avec une graine fixée, et identité avec `p = 0`.
 - **Comportement propre** : gamma monotone avec des valeurs négatives, FDA à `beta = 0` égal à l'original, phase conservée par FDA, histogrammes rapprochés par l'histogram matching.
 - **Chargement** : LAS et PSR réorientés en RAS, 1 mm, volume du cerveau conservé, grille gardée pour un volume déjà à 1 mm, masque 0,99999998, fond de R029, masque vide signalé, exclusion de R032, z-score.
 - **Configurations et adaptateur MONAI** : chaque YAML se construit et s'applique, les transformations sont sérialisables pour les `DataLoader`.
+- **Chargeur C1** (`test_data_processed.py`), sur un jeu prétraité synthétique de moins de 64³ écrit dans un dossier temporaire : clés et z-score, chargement paresseux et sérialisable, masque 0,99999998 seuillé, cerveau lu dans `brain.nii.gz`, masque vide signalé, découpages et plis, R032 exclu, erreurs claires (orientation, espacement, grille, sujet manquant, table absente), calibration et `visual_check` avec `--source processed`, et un test de bout en bout `load_processed` → `build_transforms(monai=True)` dans un `Compose` MONAI, avec références FDA et histogram matching prises dans C1.
 - **Aucun centre de test dans les réglages** (`test_calibration.py`) : centres de référence des YAML, centres utilisés par `calibration.json` et ses balayages, empreinte de `splits.json`, accord entre les YAML et `calibration.json`, refus d'un centre OOD par `check_training_sites`, `build_transforms` et `visual_check`, références prises hors du test ID, et référence de chaque pli hors de ses centres de validation.
 
 ### Vérification visuelle
@@ -293,10 +327,12 @@ Sur les volumes réels (7 à 12,5 millions de voxels), les temps médians mesur�
 
 En moyenne par volume synthétique, avec leurs probabilités : 0,26 s pour `intensity.yaml` et 0,52 s pour `bigaug.yaml`. Un patch de 128³ contient trois fois moins de voxels (2,1 millions) : les temps y seront plus courts, mais ce n'est pas mesuré.
 
+Avec `--source processed` (4 novembre 2026, un essai), le même cerveau synthétique écrit au format C1 et recadré fait 168 × 198 × 168 voxels (5,6 millions) : 0,05 à 0,18 s pour l'intensité, 0,33 s pour FDA, 0,40 s pour l'histogram matching, 0,60 s pour RandConv et 0,95 s pour GIN ; 0,13 s en moyenne pour `intensity.yaml` et 0,45 s pour `bigaug.yaml`. Ces temps ne sont pas directement comparables au tableau ci-dessus (autre jour, un seul essai, volume plus petit).
+
 ## Choix faits
 
 - **TorchIO comme format natif**, avec un adaptateur MONAI. Les transformations sont écrites pour ce projet plutôt que reprises de TorchIO, parce qu'elles doivent agir dans le cerveau seulement et sur des images en z-score.
-- **Fond à 0 après le z-score** (convention nnU-Net). Le fond se confond alors avec la moyenne du cerveau : c'est pour cela que le sujet porte un masque `brain`. À aligner avec le contrat C1 quand la convention de Yosra sera connue.
+- **Fond à 0 après le z-score** (convention nnU-Net). Le fond se confond alors avec la moyenne du cerveau : c'est pour cela que le sujet porte un masque `brain`. C'est aussi la convention du contrat C1 (week4.py), qui fournit `brain.nii.gz`.
 - **Gamma et biais sur une échelle positive.** L'image est ramenée entre son minimum et son 99e percentile dans le cerveau avant le gamma ; le biais multiplie l'intensité mesurée depuis le minimum du cerveau.
 - **Filtres spatiaux avec un fond sombre.** Avant un flou ou une basse résolution, le fond est mis au niveau le plus sombre du cerveau, pour que les bords se comportent comme sur une image brute.
 - **RandConv et GIN : deux écarts aux articles**, pour garder la lésion visible :
@@ -324,8 +360,9 @@ Reste :
 
 1. **Étendre la vérification visuelle** à plusieurs sujets par centre et aux centres d'entraînement non regardés, avant les premiers entraînements.
 2. **Refaire le calibrage si `splits.json` change** : `test_calibration.py` le signale par l'empreinte du fichier. Relancer `python -m generalization.calibration`, puis les deux balayages, et reporter les plages dans les YAML et dans les sections `fda_beta` et `bigaug_gamma` de `calibration.json`.
-3. **Accélérer le chargement.** `load_subject` prend 1,2 s en médiane, mais 6,7 s pour SOOP et jusqu'à 28 s : certains volumes SOOP natifs sont à 0,25 mm (354 millions de voxels pour `sub-soop0430`). Trois chargements en parallèle ont une fois épuisé les 16 Go de mémoire de la machine. Le prétraitement C1 réglera ce point ; d'ici là, un cache local des volumes à 1 mm est à prévoir pour l'entraînement.
-4. **Vérifier les valeurs de BigAug** dans l'article.
+3. **Vérifier `load_processed` sur les vraies données C1** dès l'export de Yosra : tous les sujets d'entraînement, de test ID et OOD, puis la vérification visuelle avec `--source processed`, et refaire le calibrage sur C1 pour comparer.
+4. **Chargement des données brutes lent** (repli seulement) : `load_subject` prend 1,2 s en médiane, mais 6,7 s pour SOOP et jusqu'à 28 s (volumes SOOP natifs à 0,25 mm). Les données C1, déjà à 1 mm et recadrées, règlent ce point pour l'entraînement.
+5. **Vérifier les valeurs de BigAug** dans l'article.
 
 ## Suite du bloc
 
