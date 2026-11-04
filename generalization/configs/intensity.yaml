@@ -1,15 +1,15 @@
 # Augmentation d'intensité (§3.5 a).
 # Chaque transformation a une probabilité `p` et ses plages [min, max] ; `enabled: false` la désactive.
-# Gamma et contraste calibrés sur les seuls sujets d'entraînement de splits.json
-# (python -m generalization.calibration -> calibration.json ; voir README).
+# Gamma et contraste calibrés sur les seuls sujets d'entraînement de splits.json, données C1
+# (python -m generalization.calibration --source processed -> calibration.json ; voir README).
 transforms:
   - name: gamma
     p: 0.3
-    gamma: [0.71, 1.77]       # position de la médiane sur [0, p99] : 0,41 (R030) à 0,69 (R014), médiane 0,601
+    gamma: [0.68, 1.79]       # position de la médiane sur [0, p99] : 0,41 (R030) à 0,71 (R040), médiane 0,604
 
   - name: contrast
     p: 0.3
-    factor: [0.78, 1.52]      # coefficient de variation 0,32 (R020) à 0,62 (R030), rapporté à sa médiane 0,409
+    factor: [0.77, 1.53]      # coefficient de variation 0,31 (R020) à 0,62 (R030), rapporté à sa médiane 0,406
 
   - name: noise
     p: 0.2

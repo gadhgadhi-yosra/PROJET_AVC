@@ -78,6 +78,8 @@ def test_les_configs_reprennent_le_calibrage(calibration):
     assert config_entry("bigaug.yaml", "gamma")["gamma"] == calibration["bigaug_gamma"]["range"]
     assert config_entry("fda.yaml", "fda")["beta"] == calibration["fda_beta"]["range"]
     for name, transform in [("fda.yaml", "fda"), ("histogram_matching.yaml", "histogram_matching")]:
+        # Références prises dans les mêmes données que celles du calibrage (brutes ou C1).
+        assert config_entry(name, transform).get("source", "raw") == calibration.get("source", "raw")
         assert config_entry(name, transform)["reference_sites"] == [calibration["reference"]["site"]]
         assert config_entry(name, transform)["fold_reference_sites"] == [
             reference["site"] for reference in calibration["fold_references"]]

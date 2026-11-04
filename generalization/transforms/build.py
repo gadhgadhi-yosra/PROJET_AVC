@@ -106,6 +106,12 @@ def reference_choice(entry, fold=None):
     return [by_fold[fold]], splits
 
 
+def check_source(source):
+    if source is not None and source not in DEFAULT_ROOTS:
+        raise ValueError(f"source inconnue : {source!r} (attendues : {', '.join(DEFAULT_ROOTS)})")
+    return source
+
+
 def load_config(config):
     """Accepte un chemin YAML, un dictionnaire, ou une liste des deux (transformations concaténées)."""
     if isinstance(config, (list, tuple)):
@@ -126,33 +132,34 @@ def build_transforms(config, data_root=None, monai=False, fold=None, source=None
     de paramètres ; `enabled: false` la désactive. FDA et histogram matching lisent leurs images
     de référence dans `data_root` (argument, sinon clé `data_root` de la config, sinon données brutes).
     `fold=k` prend la référence du pli k (`fold_reference_sites`), choisie hors de ses centres de validation.
-    `source` : "raw" (défaut) ou "processed" (contrat C1), origine des images de référence ; argument,
-    sinon clé `source` de la config. Le `data_root` par défaut suit la source.
+    `source` : "raw" ou "processed" (contrat C1), origine des images de référence. Priorité : argument,
+    puis clé `source` de l'entrée, puis de la config, puis "raw". Le `data_root` par défaut suit la source.
     """
     config = load_config(config)
-    source = source or config.get("source") or "raw"
-    if source not in DEFAULT_ROOTS:
-        raise ValueError(f"source inconnue : {source!r} (attendues : {', '.join(DEFAULT_ROOTS)})")
-    data_root = Path(data_root or config.get("data_root") or DEFAULT_ROOTS[source])
+    for value in (source, config.get("source")):
+        check_source(value)
     spacing = config.get("spacing", 1.0)
     transforms = []
     for entry in config.get("transforms") or []:
         entry = dict(entry)
         name = entry.pop("name")
+        entry_source = check_source(source or entry.pop("source", None) or config.get("source") or "raw")
+        entry.pop("source", None)
         if not entry.pop("enabled", True):
             continue
         if name not in REGISTRY:
             raise KeyError(f"Transformation inconnue : {name}. Disponibles : {sorted(REGISTRY)}")
+        root = Path(data_root or config.get("data_root") or DEFAULT_ROOTS[entry_source])
         if name == "fda":
             sites, splits = reference_choice(entry, fold)
-            records = reference_records(sites, entry.pop("n_references", 8), data_root, splits, fold, source)
-            entry["references"] = ReferenceBank([ReferenceLoader(record, spacing, source)
+            records = reference_records(sites, entry.pop("n_references", 8), root, splits, fold, entry_source)
+            entry["references"] = ReferenceBank([ReferenceLoader(record, spacing, entry_source)
                                                  for _, record in records.iterrows()])
         elif name == "histogram_matching":
             sites, splits = reference_choice(entry, fold)
             entry["reference_quantiles"] = _reference_quantiles(
-                sites, entry.pop("n_references", 20), data_root, spacing, entry.pop("reference_file", None),
-                splits, fold, source)
+                sites, entry.pop("n_references", 20), root, spacing, entry.pop("reference_file", None),
+                splits, fold, entry_source)
         transforms.append(REGISTRY[name](**entry))
     composed = tio.Compose(transforms)
     return MonaiAdapter(composed) if monai else composed

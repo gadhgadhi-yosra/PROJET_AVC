@@ -1,6 +1,6 @@
 {
   "date": "2026-11-04",
-  "source": "raw",
+  "source": "processed",
   "splits": {
     "file": "splits.json",
     "version": 1,
@@ -66,36 +66,36 @@
     "R070",
     "R071"
   ],
-  "n_training_subjects": 917,
+  "n_training_subjects": 916,
   "gamma": {
     "range": [
-      0.71,
-      1.77
+      0.68,
+      1.79
     ],
     "raw": [
-      0.719,
-      1.765
+      0.686,
+      1.783
     ],
     "sites": [
-      "R014",
+      "R040",
       "R030"
     ],
-    "position_median": 0.601
+    "position_median": 0.604
   },
   "contrast": {
     "range": [
-      0.78,
-      1.52
+      0.77,
+      1.53
     ],
     "raw": [
-      0.787,
-      1.519
+      0.772,
+      1.527
     ],
     "sites": [
       "R020",
       "R030"
     ],
-    "cv_median": 0.409
+    "cv_median": 0.406
   },
   "reference": {
     "site": "R059",
@@ -104,42 +104,42 @@
       {
         "site": "R059",
         "n": 30,
-        "w1": 0.0091
+        "w1": 0.0094
       },
       {
         "site": "R071",
         "n": 21,
-        "w1": 0.0101
-      },
-      {
-        "site": "R010",
-        "n": 21,
-        "w1": 0.0159
+        "w1": 0.0129
       },
       {
         "site": "R004",
         "n": 30,
-        "w1": 0.0181
+        "w1": 0.0153
       },
       {
         "site": "R011",
         "n": 23,
-        "w1": 0.0205
+        "w1": 0.0163
+      },
+      {
+        "site": "R010",
+        "n": 21,
+        "w1": 0.0179
       },
       {
         "site": "R052",
         "n": 26,
-        "w1": 0.0223
+        "w1": 0.0191
       },
       {
         "site": "R001",
         "n": 31,
-        "w1": 0.0324
+        "w1": 0.0278
       },
       {
         "site": "R009",
         "n": 89,
-        "w1": 0.0357
+        "w1": 0.0309
       }
     ]
   },
@@ -152,7 +152,8 @@
       0.015,
       0.03
     ],
-    "date": "2026-11-03",
+    "date": "2026-11-04",
+    "source": "processed",
     "reference_site": "R059",
     "sweep_sites": [
       "R015",
@@ -174,25 +175,49 @@
       0.08,
       0.12
     ],
-    "criteria": "borne basse : demi-côté b >= 2 sur tous les volumes (sinon changement négligeable) ; borne haute : ombrage à l'échelle de plusieurs centimètres, sans taches de la taille d'une lésion (visibles dès 0,05), et contraste conservé minimal >= 0,7",
+    "criteria": "borne basse : demi-côté b >= 2 sur tous les volumes (sinon changement négligeable) ; borne haute : b sous le trentième du plus petit côté (ombrage de plusieurs centimètres, pas de taches de la taille d'une lésion) et contraste conservé minimal >= 0,65",
+    "half_width": {
+      "0.015": [
+        2,
+        2
+      ],
+      "0.03": [
+        4,
+        4
+      ],
+      "0.05": [
+        7,
+        7
+      ]
+    },
     "kept_min": {
-      "0.015": 0.76,
-      "0.03": 0.73,
+      "0.015": 0.79,
+      "0.03": 0.68,
       "0.04": 0.66,
-      "0.05": 0.62,
-      "0.12": 0.51
+      "0.05": 0.64,
+      "0.12": 0.58
+    },
+    "raw_sweep": {
+      "date": "2026-11-03",
+      "kept_min": {
+        "0.015": 0.76,
+        "0.03": 0.73,
+        "0.05": 0.62,
+        "0.12": 0.51
+      }
     }
   },
   "bigaug_gamma": {
     "range": [
+      0.68,
+      1.79
+    ],
+    "previous": [
       0.71,
       1.77
     ],
-    "previous": [
-      0.7,
-      1.85
-    ],
-    "date": "2026-11-03",
+    "date": "2026-11-04",
+    "source": "processed",
     "sweep_sites": [
       "R015",
       "R029",
@@ -204,17 +229,17 @@
     "gammas": [
       0.5,
       0.6,
-      0.71,
+      0.68,
       0.85,
       1.0,
       1.4,
-      1.77,
+      1.79,
       1.85,
       2.5,
       3.5,
       4.5
     ],
-    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 10 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux"
+    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 9 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux"
   },
   "fold_references": [
     {
@@ -236,29 +261,29 @@
         {
           "site": "R059",
           "n": 30,
-          "w1": 0.01
+          "w1": 0.0103
         },
         {
           "site": "R071",
           "n": 21,
-          "w1": 0.0169
+          "w1": 0.0191
         },
         {
           "site": "R004",
           "n": 30,
-          "w1": 0.0248
+          "w1": 0.0207
         },
         {
           "site": "R011",
           "n": 23,
-          "w1": 0.0274
+          "w1": 0.0225
         }
       ]
     },
     {
       "fold": 1,
       "site": "R071",
-      "n_subjects": 734,
+      "n_subjects": 733,
       "validation_centers": [
         "R015",
         "R018",
@@ -274,29 +299,29 @@
         {
           "site": "R071",
           "n": 21,
-          "w1": 0.0046
+          "w1": 0.0052
         },
         {
           "site": "R004",
           "n": 30,
-          "w1": 0.0116
+          "w1": 0.0092
         },
         {
           "site": "R011",
           "n": 23,
-          "w1": 0.0131
+          "w1": 0.0107
         },
         {
           "site": "R052",
           "n": 26,
-          "w1": 0.014
+          "w1": 0.012
         }
       ]
     },
     {
       "fold": 2,
       "site": "R059",
-      "n_subjects": 733,
+      "n_subjects": 732,
       "validation_centers": [
         "R005",
         "R017",
@@ -312,29 +337,29 @@
         {
           "site": "R059",
           "n": 30,
-          "w1": 0.009
+          "w1": 0.0093
         },
         {
           "site": "R010",
           "n": 21,
-          "w1": 0.0156
+          "w1": 0.0152
         },
         {
           "site": "R071",
           "n": 21,
-          "w1": 0.0185
+          "w1": 0.0212
         },
         {
           "site": "R004",
           "n": 30,
-          "w1": 0.0265
+          "w1": 0.0229
         }
       ]
     },
     {
       "fold": 3,
-      "site": "R010",
-      "n_subjects": 734,
+      "site": "R004",
+      "n_subjects": 733,
       "validation_centers": [
         "R001",
         "R002",
@@ -349,31 +374,31 @@
       ],
       "ranking": [
         {
-          "site": "R010",
-          "n": 21,
-          "w1": 0.0161
-        },
-        {
           "site": "R004",
           "n": 30,
-          "w1": 0.0183
+          "w1": 0.0154
+        },
+        {
+          "site": "R010",
+          "n": 21,
+          "w1": 0.0181
         },
         {
           "site": "R052",
           "n": 26,
-          "w1": 0.0222
+          "w1": 0.019
         },
         {
           "site": "R009",
           "n": 89,
-          "w1": 0.0364
+          "w1": 0.0314
         }
       ]
     },
     {
       "fold": 4,
       "site": "R071",
-      "n_subjects": 734,
+      "n_subjects": 733,
       "validation_centers": [
         "R003",
         "R004",
@@ -391,22 +416,22 @@
         {
           "site": "R071",
           "n": 21,
-          "w1": 0.0047
-        },
-        {
-          "site": "R059",
-          "n": 30,
-          "w1": 0.0125
+          "w1": 0.0072
         },
         {
           "site": "R011",
           "n": 23,
-          "w1": 0.0144
+          "w1": 0.0118
+        },
+        {
+          "site": "R059",
+          "n": 30,
+          "w1": 0.0119
         },
         {
           "site": "R052",
           "n": 26,
-          "w1": 0.0161
+          "w1": 0.0135
         }
       ]
     }

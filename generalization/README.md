@@ -4,11 +4,12 @@ Techniques de généralisation de la question RQ3 (§3.5 du document de projet) 
 
 État au 4 novembre 2026 :
 
-- **chargeur des données prétraitées C1** (`data_processed.py`), testé sur des volumes synthétiques au format de `preprocessing/week4.py` ; les scripts acceptent `--source raw|processed` ([détail](#données-prétraitées-contrat-c1)) ;
-- **recalibrage sur les seuls sujets d'entraînement de `splits.json`** : plages de gamma et de contraste, centre de référence R059 au lieu de R009 (et une référence par pli de validation croisée), `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-du-3-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
-- les 187 tests passent sur des volumes synthétiques ;
-- le chargement a été vérifié sur les 1 416 sujets réels (14 octobre) ;
-- les transformations ont été regardées sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) ;
+- **données C1 produites et vérifiées sur cette machine** : 1 415 sujets prétraités par le code de Yosra (un échec, `R065_sub-r065s019`) ; `load_processed` les charge sur tous les découpages sans erreur de format ([détail](#données-c1-sur-cette-machine)) ;
+- **calibrage refait sur C1**, la source de l'entraînement : gamma 0,68 – 1,79, contraste 0,77 – 1,53, référence R059 (par pli : R059, R071, R059, R004, R071), `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-sur-c1-du-4-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
+- chargeur C1 (`data_processed.py`) ; les scripts acceptent `--source raw|processed` ;
+- les 187 tests passent sur des volumes synthétiques (3 de plus se lancent avec les données réelles) ;
+- le chargement brut a été vérifié sur les 1 416 sujets réels (14 octobre) ;
+- les transformations ont été regardées sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040), en C1 ;
 - deux défauts du chargement ont été corrigés le 14 octobre (lecture de deux masques de R040, rééchantillonnage des volumes déjà à 1 mm).
 
 Ce qui reste à faire est [en fin de document](#reste-à-faire).
@@ -17,6 +18,7 @@ Ce qui reste à faire est [en fin de document](#reste-à-faire).
 |---|---|
 | `data_processed.py` | Charge les données prétraitées du contrat C1 en `torchio.Subject`, par découpage et par pli de `splits.json` |
 | `data_raw.py` | Repli : liste et charge les sujets bruts en `torchio.Subject` (RAS, 1 mm, z-score dans le cerveau) |
+| `preprocess_c1_local.py` | Produit les données C1 sous Windows avec le code de Yosra tel quel, sans Spark |
 | `transforms/` | Les transformations et `build_transforms(config)` |
 | `configs/*.yaml` | Une configuration par famille, plus `baseline.yaml` (aucune transformation) |
 | `contrast.py` | Rapport d'intensité lésion / tissu voisin |
@@ -90,7 +92,7 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 - **Masques** : lésion seuillée à `> 0.5` ; cerveau lu dans `brain.nii.gz`, jamais déduit de « > 0 » (après z-score, la moitié du cerveau est négative).
 - **Contrôles dès la liste** (en-têtes seulement) : orientation RAS, voxels de 1 mm, même grille pour les trois volumes. Sinon `ProcessedFormatError` avec le sujet et le fichier en cause.
 - **Masques vides** : signalés par un avertissement et gardés comme cas négatifs (`empty_mask`), jamais une erreur.
-- **Sujets manquants** : un sujet du découpage sans volumes est une erreur ; `on_missing="warn"` l'écarte avec un avertissement (utile tant que les 14 sujets en erreur de recadrage du côté C1 ne sont pas traités).
+- **Sujets manquants** : un sujet du découpage sans volumes est une erreur ; `on_missing="warn"` l'écarte avec un avertissement (cas de `R065_sub-r065s019`, en échec côté C1).
 - **R032** est toujours exclu.
 - **Normalisation réversible** : `norm_mean` et `norm_std` viennent de `qc.json` (`raw_mean`, `raw_std`) : brut = z × `norm_std` + `norm_mean`, comme avec `data_raw`.
 
@@ -99,12 +101,29 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 ```powershell
 .venv-dl\Scripts\python -m generalization.calibration --source processed   # espacement natif lu dans les données brutes
 .venv-dl\Scripts\python -m generalization.visual_check --source processed --sites R015 R029 R014
-.venv-dl\Scripts\python -m generalization.benchmark --source processed     # volume synthétique au format C1
+.venv-dl\Scripts\python -m generalization.benchmark --source processed --data-root data\processed   # vrais volumes C1
 ```
 
-Avec `--source processed`, la calibration reconstruit les intensités brutes dans le cerveau (brut = z × `raw_std` + `raw_mean`), après rééchantillonnage à 1 mm : les grandeurs sont proches de celles des données brutes, pas identiques. Le critère « 1 mm isotrope » du centre de référence porte sur l'espacement natif, lu dans les en-têtes bruts ; sans données brutes, il ne peut pas être évalué. `calibration.json` note la source (`"source"`). Le calibrage actuel vient des données brutes : le refaire sur C1 changera peut-être légèrement les plages, et les tests signaleront tout écart avec les YAML.
+Avec `--source processed`, la calibration reconstruit les intensités brutes dans le cerveau (brut = z × `raw_std` + `raw_mean`), après rééchantillonnage à 1 mm : les grandeurs sont proches de celles des données brutes, pas identiques. Le critère « 1 mm isotrope » du centre de référence porte sur l'espacement natif, lu dans les en-têtes bruts ; sans données brutes, il ne peut pas être évalué. `calibration.json` note la source (`"source"`) ; les entrées `fda` et `histogram_matching` portent `source: processed`, et un test vérifie que les deux concordent.
 
-**Pas encore vérifié sur les vraies données C1**, absentes de cette machine : seulement sur des volumes synthétiques écrits comme `week4.py` (même stockage int16, mêmes `qform`/`sform`, même recadrage). À faire dès que l'export de Yosra est disponible : `load_processed` sur tous les sujets, puis la vérification visuelle.
+### Données C1 sur cette machine
+
+Les données C1 ont été produites le 4 novembre 2026 sur ce poste Windows, avec le code de Yosra tel quel. Son lanceur (`preprocessing/run_week4.sh`) vise macOS et Spark exige `winutils.exe` sous Windows (`addPyFile` échoue sans `HADOOP_HOME`) : `preprocess_c1_local.py` appelle donc ses fonctions `pipeline.inventory` et `week4.work` sans les modifier, avec des processus Python au lieu de Spark et la même règle pour les volumes de plus de 40 M voxels (un par un, à la fin).
+
+```powershell
+uv venv --python 3.12 .venv-spark                                        # environnement du pipeline, ignoré par Git
+uv pip install --python .venv-spark\Scripts\python.exe -r requirements.txt   # requirements.txt racine, sans modification
+.venv-spark\Scripts\python generalization\preprocess_c1_local.py --workers 2   # ~50 min, 3,6 Go dans data\processed
+```
+
+Attention : `subjects.parquet` ne décrit que le dernier lot traité. Un essai avec `--cases` doit écrire ailleurs (`--output`), sinon il remplace la table complète.
+
+Résultat (1 453 sujets, 50 min avec 2 processus) :
+
+- **1 415 sujets `ok`**, 37 exclus (R032), **1 échec : `R065_sub-r065s019`** (`lesion_outside_image_based_crop` : plus de 1 % de la lésion hors du recadrage calculé sur l'image). Ce sujet appartient au pool d'entraînement (validation du pli 0) ; `on_missing="warn"` l'écarte. À traiter côté C1.
+- **`load_processed` sur tous les découpages** : entraînement 916/917, test ID 231/231, test OOD 268/268, plis 732 à 734 sujets ; aucune erreur de format (RAS, 1 mm, grilles), aucun sujet orphelin, identifiants conformes à `splits.json`.
+- **Masques vides** : les 5 connus (R041 s108 et R065 s002 en entraînement ; R053 s016, SOOP 0910 et 0961 en test OOD), gardés comme cas négatifs.
+- **Validateur de Yosra** (`preprocessing/validate_s4.py`) : sur un essai de 92 sujets, `sub-r002s001` est rejeté de justesse (moyenne du cerveau 1,24e-4 et écart-type 0,99987 pour une tolérance de 1e-4) ; c'est l'effet du z-score stocké en int16 (pas de 0,001), pas une erreur. Signalé à Yosra.
 
 ## Ce que fait le chargement provisoire (données brutes)
 
@@ -143,15 +162,33 @@ Le preset `bigaug.yaml` empile flou, netteté, bruit, luminosité, gamma et tran
 
 ## Calibrage
 
-**Règle : aucun réglage ne voit un centre de test.** Tous les réglages sont faits sur les seuls **sujets d'entraînement** de `splits.json` (917 sujets, 48 centres), sans les sujets du test ID, sans les six centres OOD (R008, R028, R031, R034, R053, SOOP) ni le centre exclu R032. Le module `calibration.py` lit `splits.json`, refuse tout centre tenu à l'écart et écrit le résultat agrégé par centre dans `calibration.json` (versionné). Les mesures par sujet restent en local dans `generalization\figures\calibration\`. `visual_check.py` se limite aussi aux sujets d'entraînement et refuse un centre de test, sauf avec `--include-held-out` (inspection seulement).
+**Règle : aucun réglage ne voit un centre de test.** Tous les réglages sont faits sur les seuls **sujets d'entraînement** de `splits.json` (917 sujets, 48 centres ; 916 en C1), sans les sujets du test ID, sans les six centres OOD (R008, R028, R031, R034, R053, SOOP) ni le centre exclu R032. Le module `calibration.py` lit `splits.json`, refuse tout centre tenu à l'écart et écrit le résultat agrégé par centre dans `calibration.json` (versionné). Les mesures par sujet restent en local dans `generalization\figures\calibration\`. `visual_check.py` se limite aussi aux sujets d'entraînement et refuse un centre de test, sauf avec `--include-held-out` (inspection seulement).
 
 ```powershell
-.venv-dl\Scripts\python -m generalization.calibration          # gamma, contraste, centre de référence (~3 min)
+.venv-dl\Scripts\python -m generalization.calibration --source processed   # gamma, contraste, références (~1 min sur C1)
 ```
 
-Les tests de `tests/test_calibration.py` échouent si un centre de test apparaît dans un réglage ou une configuration, si les configurations ne reprennent pas `calibration.json`, ou si `splits.json` a changé depuis le calibrage.
+Les tests de `tests/test_calibration.py` échouent si un centre de test apparaît dans un réglage ou une configuration, si les configurations ne reprennent pas `calibration.json` (plages, références, source), ou si `splits.json` a changé depuis le calibrage.
 
-### Recalibrage du 3 novembre 2026
+### Recalibrage sur C1 du 4 novembre 2026
+
+L'entraînement se fera sur les données C1 : le calibrage est refait sur elles (916 sujets d'entraînement, `R065_sub-r065s019` manquant), avec les mêmes méthodes. Les valeurs bougent peu ; les volumes C1 étant recadrés, les balayages de FDA et du gamma de BigAug sont refaits aussi.
+
+| Paramètre | Données brutes (3 novembre) | **C1 (actuel)** | Fixé par (C1) |
+|---|---|---|---|
+| `gamma` de `intensity.yaml` | 0,71 – 1,77 | **0,68 – 1,79** | R040 – R030 |
+| `factor` de `contrast` | 0,78 – 1,52 | **0,77 – 1,53** | R020 – R030 |
+| `reference_sites` (entraînement final) | R059 | **R059** | distance au pool |
+| `fold_reference_sites` (plis 0 à 4) | R059, R071, R059, R010, R071 | **R059, R071, R059, R004, R071** | distance au pool du pli |
+| `beta` de FDA | 0,015 – 0,03 | **0,015 – 0,03** | balayage C1 |
+| `gamma` du preset BigAug | 0,71 – 1,77 | **0,68 – 1,79** | balayage C1 |
+| Source des images de référence | brutes | **C1** (`source: processed`) | — |
+
+- **Gamma, 0,68 à 1,79.** Position de la médiane du cerveau sur [0, p99] : 0,41 (R030) à 0,71 (R040), médiane 0,604 ; gamma brut 0,686 à 1,783. R040 remplace R014 comme centre le plus clair : sur C1, R014 vaut 0,698 et R040 0,708 (0,69 sur données brutes).
+- **Contraste, 0,77 à 1,53.** Coefficient de variation 0,31 (R020) à 0,62 (R030), médiane 0,406 ; facteur brut 0,772 à 1,527.
+- **Pli 3 : R004 au lieu de R010.** Les deux sont proches (0,0154 contre 0,0181) ; sur C1, R004 passe devant.
+
+### Recalibrage du 3 novembre 2026 (données brutes)
 
 Le premier réglage (14 octobre) avait été fait avant `splits.json`, sur tous les centres : il utilisait SOOP et R008, devenus des centres de test, et la borne basse du gamma venait de R032.
 
@@ -173,7 +210,29 @@ Les méthodes sont celles du premier réglage ; seules les données changent :
 
 ### `beta` de FDA : 0,015 à 0,03, re-balayé sur les sujets d'entraînement
 
-Le demi-côté du cube de fréquences échangé vaut `b = floor(beta × plus petit côté)`. Mesure du 3 novembre 2026 sur un sujet d'entraînement de six centres (R015, R029, R014, R030, R039, R040) et 4 images de référence de R059, toutes d'entraînement, soit 24 paires par valeur :
+Le demi-côté du cube de fréquences échangé vaut `b = floor(beta × plus petit côté)`.
+
+**Balayage sur C1 (4 novembre 2026, plage actuelle).** Mêmes six sujets d'entraînement (R015, R029, R014, R030, R039, R040), 4 images de référence C1 de R059, toutes d'entraînement, 24 paires par valeur :
+
+```powershell
+.venv-dl\Scripts\python -m generalization.visual_check --source processed --sites R015 R029 R014 R030 R039 R040 --fda-betas 0.01 0.015 0.02 0.03 0.04 0.05 0.06 0.08 0.12 --fda-references 4 --out generalization\figures\c1_fda
+```
+
+| `beta` | `b` | Changement médian (écarts-types du cerveau) | Contraste conservé, minimum |
+|---|---|---|---|
+| 0,01 | 1 | 0,17 | 0,84 |
+| 0,015 | 2 | 0,23 | 0,79 |
+| 0,02 | 2 – 3 | 0,24 | 0,79 |
+| 0,03 | 4 | 0,28 | 0,68 |
+| 0,04 | 5 – 6 | 0,30 | 0,66 |
+| 0,05 | 7 | 0,32 | 0,64 |
+| 0,06 | 8 – 9 | 0,33 | 0,63 |
+| 0,08 | 11 – 12 | 0,36 | 0,62 |
+| 0,12 | 17 – 18 | 0,40 | 0,58 |
+
+Les minima viennent tous de R030. Les volumes C1 recadrés ont un plus petit côté plus court (le `b` maximal à 0,03 passe de 5 à 4) ; la plage reste valable : `b` = 2 partout à 0,015, `b` sous le trentième du plus petit côté à 0,03, et le pire cas à 0,03 (0,68) reste au-dessus de celui du flou sur les mêmes sujets (0,59, à R014).
+
+**Balayage sur données brutes (3 novembre 2026).** Mêmes sujets, références brutes de R059 :
 
 ```powershell
 .venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --fda-betas 0.01 0.015 0.02 0.03 0.04 0.05 0.06 0.08 0.12 --fda-references 4 --out generalization\figures\recal_fda
@@ -202,9 +261,11 @@ Limites : un seul centre de référence, six sujets, volumes entiers dont le plu
 
 Ancien balayage (14 octobre, avec SOOP et R008 et des références de R009) : même plage retenue, contraste conservé minimal de 0,63 à 0,03 et 0,27 à 0,08 (R008).
 
-### Gamma du preset BigAug : 0,71 à 1,77 au lieu de 0,5 à 4,5
+### Gamma du preset BigAug : 0,68 à 1,79 au lieu de 0,5 à 4,5
 
-Re-balayé le 3 novembre 2026 sur un sujet d'entraînement de six centres : R015 (0,5 mm anisotrope, à la place de SOOP), R029, R014, R030 (le centre le plus sombre, à la place de R008), R039 et R040.
+**Sur C1 (4 novembre 2026, plage actuelle)**, mêmes six sujets d'entraînement (`--source processed --gammas …`, sorties dans `generalization\figures\c1_gamma`) : au gamma de 1,79, 1 à 5 % du cerveau passe au noir (R030 : 33 %, 8 % sans transformation) ; à 2,5, 9 à 13 % (R030 : 48 %) ; un gamma de 0,5 garde 0,51 à 0,59 du contraste de la lésion, 0,68 en garde 0,69 à 0,76. Mêmes conclusions que sur les données brutes : le preset reprend la plage calibrée de `intensity.yaml`, soit 0,68 à 1,79.
+
+**Sur données brutes (3 novembre 2026)**, sur un sujet d'entraînement de six centres : R015 (0,5 mm anisotrope, à la place de SOOP), R029, R014, R030 (le centre le plus sombre, à la place de R008), R039 et R040.
 
 ```powershell
 .venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --gammas 0.5 0.6 0.71 0.85 1.0 1.4 1.77 1.85 2.5 3.5 4.5 --out generalization\figures\recal_gamma
@@ -229,23 +290,23 @@ Le centre de référence de FDA et de l'histogram matching est le paramètre `re
 
 - **Critères** : au moins 20 sujets d'entraînement, 1 mm isotrope (pas de rééchantillonnage) et au moins 200 niveaux de gris dans le cerveau. Ce dernier critère écarte R029 et son histogramme en peigne (73 niveaux) ; le centre suivant en a 242.
 - **Choix** : la plus petite distance W1 entre l'histogramme moyen du centre (intensité / p99) et celui du reste du pool d'entraînement. Un centre « typique » déforme le moins les images qu'on harmonise vers lui.
-- **Classement** : R059 (0,009), R071 (0,010), R010 (0,016), R004 (0,018), R011 (0,021), R052 (0,022), R001 (0,032), R009 (0,036). R009, la référence provisoire, n'arrive qu'en 8e position.
-- **Seuls les sujets d'entraînement de R059 servent de référence**, jamais ceux du test ID : la clé `splits: splits.json` des entrées `fda` et `histogram_matching` le garantit et refuse un centre de test à la construction.
+- **Classement sur C1** : R059 (0,009), R071 (0,013), R004 (0,015), R011 (0,016), R010 (0,018). Sur données brutes : R059 (0,009), R071 (0,010), R010 (0,016), R004 (0,018), R011 (0,021), R052 (0,022), R001 (0,032), R009 (0,036) ; R009, la référence provisoire, n'arrivait qu'en 8e position.
+- **Seuls les sujets d'entraînement de R059 servent de référence**, jamais ceux du test ID : la clé `splits: splits.json` des entrées `fda` et `histogram_matching` le garantit et refuse un centre de test à la construction. Les images de référence sont lues dans C1 (`source: processed`), avec le même recadrage et la même normalisation que les images entraînées.
 
 #### Référence pli par pli
 
 Chaque centre d'entraînement est un centre de validation dans un des 5 plis ; R059 l'est dans le pli 3. Pour qu'aucun pli ne voie sa validation, la référence est choisie **pli par pli**, avec le même critère, en ne gardant que les sujets d'entraînement du pli : ses centres de validation ne sont ni candidats ni comptés dans le pool qui sert à mesurer la distance.
 
-| Pli | 0 | 1 | 2 | 3 | 4 | Entraînement final |
+| Pli (C1) | 0 | 1 | 2 | 3 | 4 | Entraînement final |
 |---|---|---|---|---|---|---|
-| Référence | R059 | **R071** | R059 | **R010** | **R071** | R059 |
-| Distance W1 | 0,010 | 0,005 | 0,009 | 0,016 | 0,005 | 0,009 |
-| Deuxième du classement | R071 | R004 | R010 | R004 | R059 | R071 |
+| Référence | R059 | **R071** | R059 | **R004** | **R071** | R059 |
+| Distance W1 | 0,010 | 0,005 | 0,009 | 0,015 | 0,007 | 0,009 |
+| Deuxième du classement | R071 | R004 | R010 | R010 | R011 | R071 |
 
-R059 est exclu du pli 3, où il sert à la validation. Aux plis 1 et 4, R059 reste autorisé, mais une fois les centres de validation retirés du pool, R071 devient le plus proche. Le choix est refait dans chaque pli au lieu de reprendre le classement global : c'est la même procédure que celle qu'on évalue, appliquée sans voir la validation.
+R059 est exclu du pli 3, où il sert à la validation. Aux plis 1 et 4, R059 reste autorisé, mais une fois les centres de validation retirés du pool, R071 devient le plus proche. Le choix est refait dans chaque pli au lieu de reprendre le classement global : c'est la même procédure que celle qu'on évalue, appliquée sans voir la validation. Sur données brutes, le pli 3 donnait R010 ; sur C1, R004 passe devant de peu.
 
 ```python
-transform = build_transforms("generalization/configs/fda.yaml", fold=3)   # référence R010, sujets d'entraînement du pli 3
+transform = build_transforms("generalization/configs/fda.yaml", fold=3)   # référence R004, sujets d'entraînement C1 du pli 3
 final = build_transforms("generalization/configs/fda.yaml")               # référence R059, tous les sujets d'entraînement
 ```
 
@@ -255,7 +316,7 @@ Les références par pli sont dans la clé `fold_reference_sites` des entrées `
 
 ### Tests
 
-`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 187 tests, environ 30 secondes, sans donnée patient (2 tests de plus se lancent si les données réelles sont présentes). Ils couvrent :
+`.venv-dl\Scripts\python -m pytest generalization\tests -q` : 187 tests, environ 30 secondes, sans donnée patient (3 tests de plus se lancent si les données réelles, brutes et C1, sont présentes). Ils couvrent :
 
 - **Invariants de chaque transformation d'intensité**, sur un volume isotrope, un volume anisotrope 0,5 × 0,47 × 0,47 mm et un volume de type R029 : masque et cerveau identiques, forme et affine conservées, pas de NaN ni d'infini, fond intact, entrée non modifiée.
 - **Reproductibilité** avec une graine fixée, et identité avec `p = 0`.
@@ -269,7 +330,7 @@ Les références par pli sont dans la clé `fold_reference_sites` des entrées `
 
 ```powershell
 .venv-dl\Scripts\python -m generalization.visual_check --synthetic
-.venv-dl\Scripts\python -m generalization.visual_check --sites R015 R029 R014 R030 R039 R040 --out generalization\figures\recal_familles
+.venv-dl\Scripts\python -m generalization.visual_check --source processed --sites R015 R029 R014 R030 R039 R040 --out generalization\figures\c1_familles
 ```
 
 Sur données réelles, seuls les sujets d'entraînement de `splits.json` sont candidats (le premier du centre qui a une lésion) ; un centre de test est refusé, sauf avec `--include-held-out`.
@@ -278,7 +339,28 @@ Le script écrit une figure par famille et par sujet : coupe axiale où la lési
 
 Le **rapport L/V** est la médiane de l'intensité dans la lésion divisée par celle d'une couronne de 3 voxels autour, comme `lesion_vs_shell` de l'exploration. Le **contraste conservé** vaut `(1 − L/V après) / (1 − L/V avant)` : 1 s'il est inchangé, 0 si la lésion devient invisible, négatif si elle devient plus claire que son voisinage.
 
-#### Résultat sur les sujets d'entraînement (3 novembre 2026, réglages recalibrés)
+#### Résultat sur C1 (4 novembre 2026, réglages actuels)
+
+Mêmes sujets d'entraînement, lus dans C1, 10 tirages par transformation, références C1 de R059. Contraste conservé **minimal** :
+
+| Transformation | R015 | R029 | R014 | R030 | R039 | R040 |
+|---|---|---|---|---|---|---|
+| *L/V d'origine* | *0,57* | *0,84* | *0,93* | *0,50* | *0,91* | *0,73* |
+| `gamma` (0,68 – 1,79) | 0,79 | 0,76 | 0,75 | 0,81 | 0,75 | 0,77 |
+| `contrast` (0,77 – 1,53) | 0,82 | 0,85 | 0,86 | 0,83 | 0,87 | 0,85 |
+| `noise` | 0,98 | 0,85 | 0,89 | 0,99 | 0,99 | 0,99 |
+| `blur` | 0,87 | 0,74 | 0,59 | 0,79 | 0,72 | 0,64 |
+| `bias_field` | 0,94 | 0,77 | 0,76 | 0,97 | 1,00 | 0,99 |
+| `low_resolution` | 0,88 | 0,72 | 0,50 | 0,82 | 0,71 | 0,65 |
+| `randconv` | 0,85 | 0,74 | 0,68 | 0,82 | 0,76 | 0,68 |
+| `gin` | 0,79 | 0,70 | 0,75 | 0,75 | 0,87 | 0,76 |
+| `fda` (`beta` 0,015 – 0,03) | 0,86 | 0,88 | 0,84 | 0,69 | 1,00 | 0,92 |
+| `histogram_matching` | 0,91 | 1,20 | 1,12 | 0,86 | 0,96 | 1,23 |
+| preset `bigaug` (gamma 0,68 – 1,79) | 0,72 | 0,75 | 0,49 | 0,71 | 0,65 | 0,54 |
+
+Aucune transformation n'inverse la lésion ; aucune transformation d'intensité n'a modifié un masque (606 tirages ; les 22 masques modifiés viennent de la transformation affine de BigAug). Les cas les plus durs sont à R014, dont la lésion fait moins de 0,1 mL et se voit à peine au départ (L/V 0,93) : basse résolution à 0,50, deux tirages BigAug à 0,49 et 0,50, tous deux avec transformation affine. Sur la figure BigAug de R014, la rotation change le plan de coupe affiché et la lésion reste à sa place. Les sujets C1 ont un L/V un peu différent des sujets bruts (R014 0,93 au lieu de 0,91, R040 0,73 au lieu de 0,69) : rééchantillonnage et recadrage du pipeline.
+
+#### Résultat sur les sujets d'entraînement (3 novembre 2026, données brutes)
 
 Un sujet d'entraînement par centre (le premier qui a une lésion), 10 tirages par transformation, référence R059. Contraste conservé **minimal** :
 
@@ -327,7 +409,9 @@ Sur les volumes réels (7 à 12,5 millions de voxels), les temps médians mesur�
 
 En moyenne par volume synthétique, avec leurs probabilités : 0,26 s pour `intensity.yaml` et 0,52 s pour `bigaug.yaml`. Un patch de 128³ contient trois fois moins de voxels (2,1 millions) : les temps y seront plus courts, mais ce n'est pas mesuré.
 
-Avec `--source processed` (4 novembre 2026, un essai), le même cerveau synthétique écrit au format C1 et recadré fait 168 × 198 × 168 voxels (5,6 millions) : 0,05 à 0,18 s pour l'intensité, 0,33 s pour FDA, 0,40 s pour l'histogram matching, 0,60 s pour RandConv et 0,95 s pour GIN ; 0,13 s en moyenne pour `intensity.yaml` et 0,45 s pour `bigaug.yaml`. Ces temps ne sont pas directement comparables au tableau ci-dessus (autre jour, un seul essai, volume plus petit).
+**Sur un vrai volume C1** (`--source processed --data-root data\processed`, 4 novembre 2026, médiane de 3 essais), `R001_sub-r001s001` recadré à 144 × 191 × 160 voxels (4,4 millions) : 0,07 à 0,16 s pour l'intensité, 0,36 s pour l'histogram matching, 0,40 s pour FDA, 0,62 s pour RandConv et 1,11 s pour GIN ; 0,19 s en moyenne pour `intensity.yaml` et 0,50 s pour `bigaug.yaml`.
+
+Avec `--source processed` sans données (4 novembre 2026, un essai), le même cerveau synthétique écrit au format C1 et recadré fait 168 × 198 × 168 voxels (5,6 millions) : 0,05 à 0,18 s pour l'intensité, 0,33 s pour FDA, 0,40 s pour l'histogram matching, 0,60 s pour RandConv et 0,95 s pour GIN ; 0,13 s en moyenne pour `intensity.yaml` et 0,45 s pour `bigaug.yaml`. Ces temps ne sont pas directement comparables au tableau ci-dessus (autre jour, un seul essai, volume plus petit).
 
 ## Choix faits
 
@@ -354,16 +438,16 @@ Vérifié le 14 octobre 2026 sur les données réelles :
 - les 1 416 sujets se chargent sans erreur ni avertissement. Les seuls masques vides sont les 5 connus, et les 48 lésions de moins de 0,1 mL de l'exploration sont retrouvées. Aucune lésion n'est perdue au rééchantillonnage : 914 volumes déjà à 1 mm gardent leur grille, 502 sont rééchantillonnés. Pour ceux-ci, le volume du cerveau change de 1,5 % au plus et celui des lésions de plus de 1 mL de 0,7 % en médiane ; les très petites lésions sont les plus touchées (0,071 → 0,053 mL pour `sub-r050s012`) ;
 - les six centres ci-dessus ont été regardés, et le `beta` de FDA réglé.
 
-Fait le 3 novembre 2026 : recalibrage sur les seuls sujets d'entraînement de `splits.json` (voir [Calibrage](#calibrage)).
+Fait le 3 novembre 2026 : recalibrage sur les seuls sujets d'entraînement de `splits.json`. Fait le 4 novembre 2026 : données C1 produites sur ce poste, `load_processed` vérifié sur tous les découpages, calibrage et balayages refaits sur C1, vérification visuelle et temps CPU sur C1 (voir [Calibrage](#calibrage)).
 
 Reste :
 
 1. **Étendre la vérification visuelle** à plusieurs sujets par centre et aux centres d'entraînement non regardés, avant les premiers entraînements.
-2. **Refaire le calibrage si `splits.json` change** : `test_calibration.py` le signale par l'empreinte du fichier. Relancer `python -m generalization.calibration`, puis les deux balayages, et reporter les plages dans les YAML et dans les sections `fda_beta` et `bigaug_gamma` de `calibration.json`.
-3. **Vérifier `load_processed` sur les vraies données C1** dès l'export de Yosra : tous les sujets d'entraînement, de test ID et OOD, puis la vérification visuelle avec `--source processed`, et refaire le calibrage sur C1 pour comparer.
+2. **Refaire le calibrage si `splits.json` ou C1 change** : `test_calibration.py` le signale par l'empreinte du fichier. Relancer `python -m generalization.calibration --source processed`, puis les deux balayages, et reporter les plages dans les YAML et dans les sections `fda_beta` et `bigaug_gamma` de `calibration.json`.
+3. **`R065_sub-r065s019`** : en échec côté C1 (`lesion_outside_image_based_crop`), écarté par `on_missing="warn"`. Si Yosra le corrige, relancer `preprocess_c1_local.py` (reprise automatique des autres sujets).
 4. **Chargement des données brutes lent** (repli seulement) : `load_subject` prend 1,2 s en médiane, mais 6,7 s pour SOOP et jusqu'à 28 s (volumes SOOP natifs à 0,25 mm). Les données C1, déjà à 1 mm et recadrées, règlent ce point pour l'entraînement.
 5. **Vérifier les valeurs de BigAug** dans l'article.
 
 ## Suite du bloc
 
-Ne sont pas dans ce livrable : la normalisation de type Fan-Net, DANN (inversion de gradient et classifieur de centre), TENT (adaptation au test), le tableau d'ablation RQ3 et l'adaptation continue contrôlée (§5.1). DANN et TENT se branchent dans le modèle et la boucle d'entraînement : ils dépendent du contrat C4.
+Ne sont pas dans ce livrable : la normalisation de type Fan-Net, le tableau d'ablation RQ3 et l'adaptation continue contrôlée (§5.1). DANN et TENT sont dans `adaptation/` (voir son README) ; leur branchement dans la boucle d'entraînement dépend du contrat C4.

@@ -251,6 +251,7 @@ def synthetic_config(path):
         entry = dict(entry)
         if "reference_sites" in entry:
             entry.pop("splits", None)
+            entry.pop("source", None)
             entry["reference_sites"] = ["R009"]
         entries.append(entry)
     return {"transforms": entries}

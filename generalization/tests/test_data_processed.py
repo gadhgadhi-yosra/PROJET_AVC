@@ -259,6 +259,27 @@ def test_visual_check_sur_donnees_pretraitees_synthetiques(tmp_path):
     assert (tmp_path / "resume.csv").is_file()
 
 
+# --- Vraies données C1, si elles sont sur la machine (jamais dans Git) ---
+
+REAL_C1 = Path(__file__).resolve().parents[2] / "data" / "processed"
+
+
+@pytest.mark.skipif(not (REAL_C1 / "subjects.parquet").is_file(), reason="données C1 absentes")
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_donnees_c1_reelles():
+    from generalization.calibration import load_splits
+    splits = load_splits()
+    for split in ("train", "id_test", "ood_test"):
+        records = list_processed(REAL_C1, split, on_missing="warn")
+        assert len(records) >= len(splits[split]) - 1, split  # R065_sub-r065s019 en échec côté C1
+        assert set(records["case_id"]) <= set(splits[split])
+    subject = load_processed_subject(records.iloc[0])
+    brain = subject["brain"].data.bool()
+    assert subject["t1"].orientation == ("R", "A", "S") and np.allclose(subject["t1"].spacing, 1.0)
+    assert abs(float(subject["t1"].data[brain].mean())) < 1e-3
+    assert float(subject["t1"].data[~brain].abs().max()) == 0
+
+
 def test_sujet_isole(processed):
     root, splits = processed
     record = list_processed(root, splits=splits).iloc[0]

@@ -10,6 +10,7 @@ transforms:
     # Centre d'entraînement le plus proche du reste du pool (calibration.json) ; R009 avant splits.json.
     reference_sites: [R059]
     # build_transforms(config, fold=k) : référence du pli k, choisie hors de ses centres de validation.
-    fold_reference_sites: [R059, R071, R059, R010, R071]
+    fold_reference_sites: [R059, R071, R059, R004, R071]
+    source: processed         # références prises dans les données prétraitées C1 (data/processed)
     splits: splits.json       # refuse un centre de test ; références prises parmi les sujets d'entraînement
     n_references: 8           # images de référence gardées en mémoire par processus
