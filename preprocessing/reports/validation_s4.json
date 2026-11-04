@@ -1,0 +1,16 @@
+{
+  "subjects": 8,
+  "status": "passed",
+  "checks": [
+    "finite",
+    "binary_masks",
+    "RAS",
+    "1mm",
+    "shared_grid",
+    "zero_background",
+    "brain_zscore",
+    "lesion_volume"
+  ],
+  "max_abs_brain_mean": 1.0279764865117613e-05,
+  "max_abs_std_error": 2.753734588623047e-05
+}

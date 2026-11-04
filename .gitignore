@@ -24,3 +24,10 @@ artifacts/
 
 # Généralisation : figures et mesures de visual_check.py (coupes de patients, à régénérer en local)
 generalization/figures/
+
+# Private week 4 outputs, QC and nnU-Net data
+data/processed/
+data/qc_s4/
+data/validation_s4/
+data/benchmark_s4/
+data/nnUNet_raw/

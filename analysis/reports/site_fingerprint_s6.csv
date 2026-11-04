@@ -1,0 +1,13 @@
+stage,features,model,balanced_accuracy,fold_std
+avant,"Échelle brute (log moyenne, log écart-type)",logreg,0.14141333415690666,0.013490459970421703
+avant,"Échelle brute (log moyenne, log écart-type)",random forest,0.5523533957539747,0.021403902087138642
+avant,"Forme de l’histogramme, 32 classes",logreg,0.6524591663029542,0.03147400771531735
+avant,"Forme de l’histogramme, 32 classes",random forest,0.6874488072075096,0.020177130120484152
+après,"Forme de l’histogramme, 30 classes",logreg,0.4548469338307406,0.029895964144904377
+après,"Forme de l’histogramme, 30 classes",random forest,0.4892140178392971,0.019926921662871196
+après,"Forme de l’histogramme, 150 classes",logreg,0.5165125188581777,0.026076777690512625
+après,"Forme de l’histogramme, 150 classes",random forest,0.5570082152020367,0.015739919162363142
+après,Percentiles et asymétrie du z-score,logreg,0.2972269598859584,0.00905509215014818
+après,Percentiles et asymétrie du z-score,random forest,0.3639277362397702,0.018796500543522995
+après,Taille du volume recadré,logreg,0.10433498621000303,0.006593189148037007
+après,Taille du volume recadré,random forest,0.07728669612495162,0.014978512070983612
