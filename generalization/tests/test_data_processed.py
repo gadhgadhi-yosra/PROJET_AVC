@@ -120,6 +120,21 @@ def test_decoupages_et_plis(processed):
         load_processed(root, fold=7, splits=splits)
 
 
+def test_volumes_decompresses_par_kaggle(processed, copy):
+    # Kaggle décompresse les .nii.gz téléversés en .nii : même chargement, mêmes valeurs.
+    import gzip
+    root, splits = copy
+    for compressed in root.rglob("*.nii.gz"):
+        compressed.with_suffix("").write_bytes(gzip.decompress(compressed.read_bytes()))
+        compressed.unlink()
+    original = by_subject(load_processed(processed[0], splits=processed[1]))
+    decompressed = by_subject(load_processed(root, splits=splits))
+    assert decompressed["sub-r009s001"]["t1"].path.name == "t1.nii"
+    for name, subject in decompressed.items():
+        for key in ("t1", "mask", "brain"):
+            assert torch.equal(subject[key].data, original[name][key].data), (name, key)
+
+
 def test_r032_exclu(copy):
     # Même ajouté au découpage, R032 n'est jamais chargé.
     root, splits_path = copy
