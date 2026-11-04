@@ -60,9 +60,30 @@ Six notebooks dans `kaggle/`, générés par `kaggle/make_notebooks.py` : **pli 
 
 Environ 20 à 27 h de GPU pour le pli 0 : une semaine sur trois comptes (environ 30 h chacun). Les durées sont des estimations (mesures locales sur la RTX 3050 et un processeur 4 cœurs) : la première run (baseline) les confirmera. Les autres plis viendront ensuite si le budget le permet ; la référence de FDA et de l'histogram matching suit alors le pli (`fold_reference_sites`).
 
-Chaque notebook clone la branche publique `adaptation-entrainement`, installe MONAI et TorchIO, recrée `data/processed` par des liens vers les dossiers de sujets du dataset (que Kaggle ait décompressé les archives ou non), vérifie que `splits.json` est identique dans le dataset et dans le code, puis lance `train.py`. Réglages Kaggle : accélérateur *GPU T4*, Internet activé, dataset privé `atlas-c1-processed` en entrée, notebook privé ; *Save Version → Save & Run All* pour une exécution en arrière-plan. Une session interrompue reprend avec `--resume` après avoir copié `last.pt` de la sortie précédente.
+Chaque notebook prend le code dans le dataset privé `projet-avc-code` (le dépôt GitHub devient privé), affiche son `VERSION.json` (branche et commit), installe MONAI et TorchIO, recrée `data/processed` par des liens vers les dossiers de sujets du dataset `atlas-c1-processed` (que Kaggle ait décompressé les archives ou non), vérifie que `splits.json` est identique dans les données et dans le code, puis lance `train.py`. Réglages Kaggle : accélérateur *GPU T4*, Internet activé, les deux datasets privés en entrée, notebook privé. Une session interrompue reprend avec `--resume` après avoir copié `last.pt` de la sortie précédente.
 
-### Dataset Kaggle privé
+### Lancer un notebook depuis le poste (`kaggle kernels push`)
+
+```powershell
+.venv-dl\Scripts\python adaptation\kaggle\make_notebooks.py --kernels-dir data\kaggle_kernels   # un dossier par notebook
+kaggle kernels push -p data\kaggle_kernels\00_baseline --accelerator NvidiaTeslaT4
+kaggle kernels status fayfahachicha/rq3-baseline-pli0
+kaggle kernels output fayfahachicha/rq3-baseline-pli0 -p adaptation\runs\kaggle_baseline_pli0   # à la fin
+```
+
+`kernel-metadata.json` : notebook privé, GPU, Internet, datasets `fayfahachicha/atlas-c1-processed` et `fayfahachicha/projet-avc-code`. Le CLI Kaggle 2.2.5 s'installe avec `uv tool install kaggle --with six` (dépendance `six` oubliée par le paquet) ; sous Windows, lancer `kaggle datasets create` depuis le dossier du dataset (`-p .`), sinon le CLI échoue sur un nom de fichier temporaire.
+
+### Dataset de code privé
+
+```powershell
+.venv-dl\Scripts\python adaptation\kaggle\build_code_dataset.py      # code commité seulement (git archive HEAD)
+cd data\kaggle_projet_avc_code ; kaggle datasets create -p . -r skip                 # première fois
+cd data\kaggle_projet_avc_code ; kaggle datasets version -p . -r skip -m "message"   # après chaque commit utile
+```
+
+`projet_avc_code.zip` contient `generalization/`, `adaptation/`, `baselines/common.py` (métriques importées par `train.py`), `splits.json` et `VERSION.json`. Le script refuse de construire si `generalization/` ou `adaptation/` ont des modifications non commitées, et si l'archive contient une image, un volume ou un checkpoint.
+
+### Dataset Kaggle privé des données
 
 ```powershell
 .venv-dl\Scripts\python adaptation\kaggle\build_dataset.py --username <identifiant-kaggle>   # ~20 s, 3,85 Go
@@ -73,11 +94,11 @@ Chaque notebook clone la branche publique `adaptation-entrainement`, installe MO
 ```powershell
 uv tool install kaggle                                   # CLI Kaggle, isolé de .venv-dl
 # Jeton : kaggle.com > Settings > API > Create New Token, puis placer kaggle.json dans C:\Users\Anas\.kaggle\
-kaggle datasets create -p data\kaggle_atlas_c1 --dir-mode skip     # privé par défaut : ne jamais ajouter --public
+cd data\kaggle_atlas_c1 ; kaggle datasets create -p . -r skip     # privé par défaut : ne jamais ajouter --public
 kaggle datasets status <identifiant-kaggle>/atlas-c1-processed
 ```
 
-Puis partager le dataset avec les comptes de Yosra et d'Anas (page du dataset, *Settings > Sharing*), et importer les notebooks (*File > Import Notebook*).
+Puis partager les deux datasets avec les comptes de Yosra et d'Anas (page du dataset, *Settings > Sharing*) s'ils doivent lancer des runs.
 
 La cellule « données » des notebooks a été vérifiée en local sur un faux `/kaggle/input` construit avec le jeu C1 synthétique (archives décompressées ou non, trois parties), suivie d'un entraînement `--smoke` sur le dossier reconstitué. Elle n'a pas encore tourné sur Kaggle même.
 

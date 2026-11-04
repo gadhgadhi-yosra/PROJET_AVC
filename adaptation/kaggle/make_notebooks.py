@@ -1,14 +1,20 @@
 """Génère les notebooks Kaggle du tableau d'ablation RQ3 (un par technique, mêmes pli et graine).
 
     .venv-dl\\Scripts\\python adaptation\\kaggle\\make_notebooks.py
+    .venv-dl\\Scripts\\python adaptation\\kaggle\\make_notebooks.py --kernels-dir data\\kaggle_kernels   # + kaggle kernels push
+
+Le code vient du dataset Kaggle privé `projet-avc-code` (voir build_code_dataset.py), pas de GitHub :
+le dépôt devient privé. Les données viennent du dataset privé `atlas-c1-processed`.
 """
+import argparse
 import json
+import shutil
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPOSITORY = "https://github.com/gadhgadhi-yosra/PROJET_AVC.git"
-BRANCH = "adaptation-entrainement"
+USERNAME = "fayfahachicha"
 DATASET = "atlas-c1-processed"
+CODE_DATASET = "projet-avc-code"
 FOLD, SEED = 0, 2026
 RUNS = [  # fichier, technique, titre, durée estimée sur une T4 (entraînement + validation + évaluation)
     ("00_baseline", "baseline", "Baseline (aucune technique de généralisation), puis TENT au test", "2 à 3 h"),
@@ -39,26 +45,38 @@ Run `{run}` du tableau d'ablation : UNet MONAI 3D, patches de 96³, **pli {FOLD}
 40 000 itérations (lots de 4 patches), identiques pour toutes les techniques. Durée estimée sur une T4 : {duration}
 (garde-fou à 10 h d'entraînement, session limitée à 12 h).
 
-**Avant de lancer** : accélérateur *GPU T4*, Internet activé, dataset privé `{DATASET}` ajouté en entrée.
+**Avant de lancer** : accélérateur *GPU T4*, Internet activé (installation de MONAI et TorchIO), datasets privés
+`{DATASET}` (données C1) et `{CODE_DATASET}` (code) ajoutés en entrée.
 Notebook à garder **privé** (accord d'utilisation ATLAS). *Save Version → Save & Run All* pour une exécution en arrière-plan.
 """),
         code(f"""
-# Code du projet (dépôt public) et dépendances absentes de l'image Kaggle.
-import hashlib, json, subprocess, sys
+# Code du projet (dataset privé {CODE_DATASET}) et dépendances absentes de l'image Kaggle.
+import hashlib, json, shutil, subprocess, sys, zipfile
 from pathlib import Path
 
+def find_input(slug):  # dossier d'un dataset attaché, quel que soit le chemin de montage de Kaggle
+    for pattern in (slug, f"*/{{slug}}", f"*/*/{{slug}}", f"*/*/*/{{slug}}"):
+        found = sorted(Path("/kaggle/input").glob(pattern))
+        if found:
+            return found[0]
+    raise FileNotFoundError(f"Dataset {{slug}} non attaché : " + str(sorted(Path("/kaggle/input").glob("*"))))
+
+CODE = find_input("{CODE_DATASET}")
 REPO = Path("/kaggle/working/PROJET_AVC")
 if not REPO.exists():
-    subprocess.run(["git", "clone", "--depth", "1", "--branch", "{BRANCH}", "{REPOSITORY}", str(REPO)], check=True)
+    archives = sorted(CODE.rglob("projet_avc_code.zip"))
+    if archives:
+        zipfile.ZipFile(archives[0]).extractall(REPO)
+    else:  # Kaggle a décompressé l'archive : copie de l'arborescence
+        shutil.copytree(next(CODE.rglob("adaptation/train.py")).parents[1], REPO)
+print(json.loads((REPO / "VERSION.json").read_text()))
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "monai==1.6.1", "torchio==1.2.1", "nibabel==5.4.2",
                 "pyarrow"], check=True)
-print(subprocess.run(["git", "-C", str(REPO), "log", "-1", "--oneline"], capture_output=True, text=True).stdout)
 import torch; print(torch.__version__, torch.cuda.get_device_name(0))
 """),
         code(f"""
 # Données C1 : liens vers les dossiers de sujets, quelle que soit l'archive d'origine.
-import zipfile
-INPUT = Path("/kaggle/input/{DATASET}")
+INPUT = find_input("{DATASET}")
 DATA = Path("/kaggle/working/processed")
 DATA.mkdir(exist_ok=True)
 sources = [INPUT]
@@ -101,13 +119,32 @@ for path in sorted(Path("/kaggle/working/runs/{run}").glob("resume*.json")):
             "nbformat": 4, "nbformat_minor": 5}
 
 
+def kernel_metadata(name, technique):
+    """Métadonnées de `kaggle kernels push` : notebook privé, GPU, Internet, les deux datasets privés."""
+    slug = f"rq3-{technique.replace('_', '-')}-pli{FOLD}"
+    return {"id": f"{USERNAME}/{slug}", "title": slug, "code_file": f"{name}.ipynb", "language": "python",
+            "kernel_type": "notebook", "is_private": True, "enable_gpu": True, "enable_tpu": False,
+            "enable_internet": True, "dataset_sources": [f"{USERNAME}/{DATASET}", f"{USERNAME}/{CODE_DATASET}"],
+            "competition_sources": [], "kernel_sources": []}
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--kernels-dir", type=Path,
+                        help="écrit aussi un dossier par notebook avec kernel-metadata.json (kaggle kernels push)")
+    args = parser.parse_args()
     for name, technique, title, duration in RUNS:
         path = HERE / f"{name}.ipynb"
         with open(path, "w", encoding="utf-8", newline="\n") as handle:
             json.dump(notebook(name, technique, title, duration), handle, ensure_ascii=False, indent=1)
             handle.write("\n")
         print(path)
+        if args.kernels_dir:
+            folder = args.kernels_dir / name
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, folder / path.name)
+            (folder / "kernel-metadata.json").write_text(json.dumps(kernel_metadata(name, technique), indent=2) + "\n",
+                                                         encoding="utf-8")
 
 
 if __name__ == "__main__":
