@@ -78,6 +78,7 @@ class RunConfig:
     max_iterations: int | None = 40000
     time_budget_hours: float = 10.0
     validate_every: int = 4000              # itérations
+    log_every: int = 500                    # ligne de progression (durée par itération, temps restant)
     validation_limit: int | None = None     # sujets de validation (None : tous)
     checkpoint_minutes: float = 20.0
     num_workers: int = 4
@@ -102,7 +103,7 @@ class RunConfig:
 def smoke_config(cfg):
     """Essai rapide sur un GPU de 4 Go : petit réseau, quelques sujets, quelques itérations."""
     return RunConfig(**{**asdict(cfg), "channels": (16, 32, 64, 128), "strides": (2, 2, 2), "num_res_units": 1,
-                        "max_iterations": 20, "validate_every": 10, "validation_limit": 2, "evaluation_limit": 2,
+                        "max_iterations": 20, "validate_every": 10, "log_every": 5, "validation_limit": 2, "evaluation_limit": 2,
                         "num_workers": 0, "time_budget_hours": 0.25, "checkpoint_minutes": 1e9,
                         "tent_patches": 2, "smoke": True})
 
@@ -422,6 +423,7 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
           f"{len(centers)} centres, appareil {device}, budget {cfg.time_budget_hours} h")
     model.train()
     running = []
+    window_start, window_iteration = time.time(), state["iteration"]
     for batch in loader:
         # Avancement de 0 à 1 : budget de temps, ou nombre d'itérations s'il est atteint avant.
         progress = (time.time() - started) / budget
@@ -448,6 +450,15 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
         scaler.update()
         state["iteration"] += 1
         running.append((float(loss.detach()), parts))
+        if state["iteration"] % cfg.log_every == 0:
+            now = time.time()
+            seconds = (now - window_start) / max(state["iteration"] - window_iteration, 1)
+            remaining = (cfg.max_iterations - state["iteration"]) * seconds / 3600 if cfg.max_iterations else None
+            recent = [l for l, _ in running[-cfg.log_every:]]
+            print(dict(progression=state["iteration"], heures=round((now - started) / 3600, 3),
+                       s_par_iteration=round(seconds, 3), perte=round(float(np.mean(recent)), 4), lr=f"{lr:.2e}",
+                       heures_restantes=None if remaining is None else round(remaining, 2)), flush=True)
+            window_start, window_iteration = now, state["iteration"]
         if state["iteration"] % cfg.validate_every == 0:
             state["elapsed"] = time.time() - started
             dice = validate(model, validation_records, cfg, test_transform) if len(validation_records) else float("nan")
@@ -518,6 +529,7 @@ def main():
     parser.add_argument("--time-budget-hours", type=float, default=10.0, help="garde-fou (session Kaggle de 12 h)")
     parser.add_argument("--max-iterations", type=int, default=40000, help="identique pour toutes les techniques")
     parser.add_argument("--validate-every", type=int, default=4000)
+    parser.add_argument("--log-every", type=int, default=500, help="ligne de progression toutes les N itérations")
     parser.add_argument("--validation-limit", type=int)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--patches-per-volume", type=int, default=2)
@@ -544,7 +556,7 @@ def main():
     cfg = RunConfig(technique=args.technique, fold=None if args.fold == "final" else int(args.fold),
                     data_root=args.data_root, splits=args.splits, output=args.output, seed=args.seed,
                     time_budget_hours=args.time_budget_hours, max_iterations=args.max_iterations,
-                    validate_every=args.validate_every, validation_limit=args.validation_limit,
+                    validate_every=args.validate_every, log_every=args.log_every, validation_limit=args.validation_limit,
                     num_workers=args.num_workers, patches_per_volume=args.patches_per_volume,
                     volumes_per_batch=args.volumes_per_batch, amp=not args.no_amp,
                     evaluation_limit=args.evaluation_limit)

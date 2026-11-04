@@ -100,13 +100,13 @@ assert digest(next(INPUT.rglob("splits.json"))) == digest(REPO / "splits.json"),
         code(f"""
 # Entraînement, validation sur le pli, puis évaluation sur le test ID du pli et le test OOD.
 # Session interrompue : rattacher la sortie précédente, copier last.pt dans /kaggle/working/runs/{run}/ et ajouter --resume.
-!cd {{REPO}} && python -m adaptation.train --technique {technique} --fold {FOLD} --seed {SEED} --data-root {{DATA}} --output /kaggle/working/runs --num-workers 4
+!cd {{REPO}} && python -u -m adaptation.train --technique {technique} --fold {FOLD} --seed {SEED} --data-root {{DATA}} --output /kaggle/working/runs --num-workers 4 --log-every 500
 """),
     ]
     if technique == "baseline":
         cells.append(code(f"""
 # TENT au test, par centre, sur le modèle baseline (stratégie « TENT seul »).
-!cd {{REPO}} && python -m adaptation.train --evaluate-only --checkpoint /kaggle/working/runs/{run}/best.pt --tent --data-root {{DATA}}
+!cd {{REPO}} && python -u -m adaptation.train --evaluate-only --checkpoint /kaggle/working/runs/{run}/best.pt --tent --data-root {{DATA}}
 """))
     cells.append(code(f"""
 # Résumé et fichiers à récupérer (onglet Output) ; aucune image de patient n'est écrite.
