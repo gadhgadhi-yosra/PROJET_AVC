@@ -1,0 +1,17 @@
+{
+  "subjects": 1415,
+  "status": "passed",
+  "zscore_tolerance": 0.000501,
+  "checks": [
+    "finite",
+    "binary_masks",
+    "RAS",
+    "1mm",
+    "shared_grid",
+    "zero_background",
+    "brain_zscore",
+    "lesion_volume"
+  ],
+  "max_abs_brain_mean": 0.0001992893812712282,
+  "max_abs_std_error": 0.00012767314910888672
+}

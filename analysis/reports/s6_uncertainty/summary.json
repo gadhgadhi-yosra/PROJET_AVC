@@ -1,0 +1,96 @@
+{
+  "seed": 2026,
+  "scans": 1140,
+  "centers": 25,
+  "train": 912,
+  "test": 228,
+  "bootstrap_repeats": 10000,
+  "confidence_level": 0.95,
+  "chance": 0.04,
+  "partition_sha256": "00f9c84cc144894e25bff282b8cc747ca3f8ad7fb20948cbeec2ac970c4c2d90",
+  "method": "Bootstrap percentile apparié des sujets du test, stratifié par centre ; classifieurs entraînés une seule fois sur les 80 % train.",
+  "scope": "Complément exploratoire à S6 ; ce lot réservé ne constitue pas un nouvel échantillon externe.",
+  "limitations": [
+    "Intervalles conditionnels aux modèles et à la partition fixés ; variabilité de réentraînement non incluse.",
+    "Même cohorte déjà explorée en S6 ; aucune validation confirmatoire indépendante.",
+    "Centres présents dans train et test : reconnaissance du centre, pas généralisation à un centre inconnu.",
+    "Comparaison 32 classes avant / 30 après : différence de granularité restante.",
+    "Bootstrap suppose des sujets indépendants au sein du centre ; couverture non garantie sur ce petit échantillon.",
+    "Intervalles marginaux à 95 %, sans correction pour comparaisons multiples ; aucun Dice mesuré.",
+    "Le contrôle utilise une seule permutation des labels du train ; son intervalle ne constitue ni une distribution nulle ni un test contre le hasard."
+  ],
+  "scores": [
+    {
+      "name": "logreg_avant_32",
+      "model": "logreg",
+      "representation": "avant_32",
+      "balanced_accuracy": 0.6688244363136003,
+      "ci_low": 0.6107330851638902,
+      "ci_high": 0.7266541729770059
+    },
+    {
+      "name": "logreg_apres_30",
+      "model": "logreg",
+      "representation": "apres_30",
+      "balanced_accuracy": 0.4540182139841582,
+      "ci_low": 0.39671680046819374,
+      "ci_high": 0.513382394712271
+    },
+    {
+      "name": "logreg_apres_150",
+      "model": "logreg",
+      "representation": "apres_150",
+      "balanced_accuracy": 0.4987801946935074,
+      "ci_low": 0.4352165224782099,
+      "ci_high": 0.5643724982018326
+    },
+    {
+      "name": "random forest_avant_32",
+      "model": "random forest",
+      "representation": "avant_32",
+      "balanced_accuracy": 0.7011336898395722,
+      "ci_low": 0.645998325693914,
+      "ci_high": 0.7546298128342246
+    },
+    {
+      "name": "random forest_apres_30",
+      "model": "random forest",
+      "representation": "apres_30",
+      "balanced_accuracy": 0.5106605372611565,
+      "ci_low": 0.4527014024589102,
+      "ci_high": 0.5700870814514003
+    },
+    {
+      "name": "random forest_apres_150",
+      "model": "random forest",
+      "representation": "apres_150",
+      "balanced_accuracy": 0.5913385960444784,
+      "ci_low": 0.5295802754435107,
+      "ci_high": 0.6536947860962566
+    },
+    {
+      "name": "controle_labels_train_melanges",
+      "model": "random forest",
+      "representation": "controle",
+      "balanced_accuracy": 0.026096256684491975,
+      "ci_low": 0.017112299465240642,
+      "ci_high": 0.035614973262032085
+    }
+  ],
+  "paired_differences": [
+    {
+      "model": "logreg",
+      "comparison": "apres_30_moins_avant_32",
+      "delta": -0.2148062223294423,
+      "ci_low": -0.2743968890586539,
+      "ci_high": -0.15481514347365752
+    },
+    {
+      "model": "random forest",
+      "comparison": "apres_30_moins_avant_32",
+      "delta": -0.19047315257841568,
+      "ci_low": -0.25532079642064176,
+      "ci_high": -0.12563131849230932
+    }
+  ]
+}

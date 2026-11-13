@@ -60,19 +60,20 @@ def load_pair(row):
     return a, x, labels, brain, background
 
 
-def fingerprint(row, margin):
+def fingerprint(row, margin, n4=False):
     items = [VERSION, margin]
+    if n4: items.append('n4-ants-v1')
     for key in ('t1_path', 'mask_path'):
         p = Path(row[key]); stat = p.stat()
         items.append([str(p.resolve()), stat.st_size, stat.st_mtime_ns])
     return hashlib.sha256(json.dumps(items).encode()).hexdigest()
 
 
-def transform(row, destination, margin=5, resume=True, reserve_bytes=2*1024**3):
+def transform(row, destination, margin=5, resume=True, reserve_bytes=2*1024**3, n4=False):
     out = Path(destination) / row['subject']
     marker = out / 'qc.json'
     try:
-        signature = fingerprint(row, margin)
+        signature = fingerprint(row, margin, n4)
     except Exception:
         marker.unlink(missing_ok=True)
         raise
@@ -85,6 +86,16 @@ def transform(row, destination, margin=5, resume=True, reserve_bytes=2*1024**3):
     if shutil.disk_usage(Path(destination)).free < reserve_bytes:
         raise RuntimeError('disk_space_under_reserve')
     a, x, labels, brain, background = load_pair(row)
+    if n4:
+        import ants
+        spacing = np.linalg.norm(a.affine[:3,:3], axis=0)
+        ras_to_lps = np.diag([-1.,-1.,1.])
+        itk_image = ants.from_numpy(x, origin=tuple(ras_to_lps @ a.affine[:3,3]),
+            spacing=tuple(spacing), direction=ras_to_lps @ (a.affine[:3,:3]/spacing))
+        support_image = itk_image.new_image_like(brain.astype(np.float32))
+        corrected = ants.n4_bias_field_correction(itk_image, mask=support_image).numpy()
+        if not np.isfinite(corrected).all(): raise ValueError('nonfinite_n4_output')
+        x = np.where(brain, corrected, background).astype(np.float32)
     source_lesion_ml = float(labels.sum() * abs(np.linalg.det(a.affine[:3,:3])) / 1000)
     image = resample_to_output(nib.Nifti1Image(x, a.affine), (1,1,1), order=1, cval=background)
     target = (image.shape, image.affine)
@@ -124,7 +135,7 @@ def transform(row, destination, margin=5, resume=True, reserve_bytes=2*1024**3):
     # Statistics describe the stored (quantized) values.
     normalized = quantized.astype(np.float32) * np.float32(Z_STEP)
     outside = int(np.count_nonzero((y > 0) & ~support))
-    info = dict(signature=signature, version=VERSION, background=background,
+    info = dict(signature=signature, version=VERSION, n4=n4, background=background,
                 raw_mean=mean, raw_std=std, normalized_mean=float(normalized[support].mean()),
                 normalized_std=float(normalized[support].std()), shape=list(normalized.shape),
                 crop_start=[lo for lo,hi in bounds], brain_ml=float(support.sum()/1000),
@@ -147,7 +158,7 @@ def transform(row, destination, margin=5, resume=True, reserve_bytes=2*1024**3):
     return info
 
 
-def work(row, output, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024**3):
+def work(row, output, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024**3, n4=False):
     result = dict(row, case_id=case_id(row), status='ok', error='')
     started = time.perf_counter()
     cache = Path(output) / '_qc_cache' / f'{case_id(row)}.json'
@@ -176,7 +187,7 @@ def work(row, output, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024
                           brain_ml=float(brain.sum()*vml), lesion_ml=float(y.sum()*vml),
                           empty_mask=not bool(y.any()), hist=(h/h.sum()).tolist())
         else:
-            result.update(transform(row,output,margin,resume,reserve_bytes))
+            result.update(transform(row,output,margin,resume,reserve_bytes,n4))
         days = row.get('days_post_stroke')
         result['invalid_days'] = days is not None and (not np.isfinite(days) or days < 0)
         if days is not None and not np.isfinite(days): result['days_post_stroke'] = None
@@ -189,7 +200,7 @@ def work(row, output, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024
     return result
 
 
-def spark_run(rows, output, workers, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024**3):
+def spark_run(rows, output, workers, qc_only=False, margin=5, resume=True, reserve_bytes=2*1024**3, n4=False):
     from pyspark.sql import SparkSession
     os.environ['PYSPARK_PYTHON'] = sys.executable
     os.environ.setdefault('SPARK_LOCAL_IP','127.0.0.1')
@@ -205,7 +216,7 @@ def spark_run(rows, output, workers, qc_only=False, margin=5, resume=True, reser
     try:
         def worker(row):
             from week4 import work
-            return work(row,output,qc_only,margin,resume,reserve_bytes)
+            return work(row,output,qc_only,margin,resume,reserve_bytes,n4)
         started = time.perf_counter()
         small, large = [], []
         for row in rows:
@@ -243,12 +254,20 @@ def run(args):
         estimated = sum(Path(r['t1_path']).stat().st_size * OUTPUT_SIZE_FACTOR for r in pending if r['t1_path'])
         if estimated + 2*1024**3 > shutil.disk_usage(args.output).free:
             raise RuntimeError(f'Espace insuffisant : estimation prudente {estimated/1024**3+2:.1f} Gio libres nécessaires. Utiliser --output sur un disque adapté ou --limit pour valider.')
-    results,seconds = spark_run(rows,args.output,args.workers,args.qc_only,args.margin)
+    n4 = getattr(args, 'n4', False)
+    if n4 and args.qc_only: raise ValueError('--n4 nécessite un traitement, pas --qc-only')
+    policy_path = getattr(args, 'exclusions', ROOT/'preprocessing/qc_exclusions.json')
+    policy = json.loads(policy_path.read_text()) if policy_path.is_file() and not args.qc_only else {'cases':[]}
+    exclusions = {c['case_id']:c['reason'] for c in policy['cases']}
+    active = [r for r in rows if case_id(r) not in exclusions]
+    results,seconds = spark_run(active,args.output,args.workers,args.qc_only,args.margin,n4=n4) if active else ([],0.0)
+    results.extend(dict(r,case_id=case_id(r),status='excluded',error='QC_quarantine: '+exclusions[case_id(r)],seconds=0.0)
+                   for r in rows if case_id(r) in exclusions)
     frame = pd.DataFrame(results)
     frame.to_parquet(args.output/'subjects.parquet',index=False)
     summary = dict(version=VERSION, subjects=len(rows), sites=len(frame.site.unique()),
                    statuses=frame.status.value_counts().to_dict(), seconds=seconds,
-                   qc_only=args.qc_only, workers=args.workers,
+                   qc_only=args.qc_only, workers=args.workers, n4=n4,
                    metadata_warnings=int(frame.inventory_warnings.ne('').sum()))
     write_json(args.output/'summary.json',summary)
     numeric = [c for c in ('brain_ml','lesion_ml','raw_mean','raw_std','normalized_mean','normalized_std') if c in frame]
@@ -329,6 +348,8 @@ def export_dataset(splits, processed, destination):
     # Fail before creating anything if a full contractual export is unavailable.
     missing=[i for i in all_ids if not all((processed/lookup[i]['subject']/f).is_file() for f in ('qc.json','t1.nii.gz','mask.nii.gz'))]
     if missing: raise ValueError(f'Export incomplet refusé : {len(missing)} sujets sans sorties validées')
+    n4_modes={bool(json.loads((processed/lookup[i]['subject']/'qc.json').read_text()).get('n4',False)) for i in all_ids}
+    if len(n4_modes)!=1: raise ValueError('Mélange N4/non-N4 refusé dans un même export')
     staging=destination.with_name(destination.name+'.staging')
     if staging.exists(): raise ValueError('Dossier staging préexistant, à inspecter')
     staging.mkdir(parents=True)
@@ -358,6 +379,7 @@ def export_dataset(splits, processed, destination):
         write_json(staging/'dataset.json',dict(channel_names={'0':'T1'},labels={'background':0,'lesion':1},numTraining=len(splits['train']),file_ending='.nii.gz'))
         write_json(staging/'splits_final.json',[dict(train=f['train'],val=f['val']) for f in splits['folds']])
         write_json(staging/'evaluation_split.json',dict(id_test=splits['id_test'],ood_test=splits['ood_test']))
+        write_json(staging/'preprocessing.json',dict(version=VERSION,n4=n4_modes.pop()))
         staging.rename(destination)
     except Exception:
         shutil.rmtree(staging)
@@ -376,6 +398,8 @@ def main():
     p.add_argument('--cases',type=Path,help='Liste JSON de case_id à traiter')
     p.add_argument('--margin',type=int,default=5)
     p.add_argument('--qc-only',action='store_true')
+    p.add_argument('--n4',action='store_true',help='Correction N4 optionnelle ; utiliser un dossier de sortie distinct')
+    p.add_argument('--exclusions',type=Path,default=ROOT/'preprocessing/qc_exclusions.json',help='Décisions QC versionnées ; non appliquées au QC brut')
     p=sub.add_parser('splits')
     p.add_argument('--qc',type=Path,default=ROOT/'data/qc_s4/subjects.parquet')
     p.add_argument('--output',type=Path,default=ROOT/'splits.json')

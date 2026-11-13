@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "seed": 2026,
-  "data_validation": "raw_QC_complete; full_processed_QC_required_before_training",
+  "data_validation": "processed_QC_passed_for_all_release_cases; team_review_pending",
   "selection": "6 centres: 3 strates de taille, distance histogramme proche/lointaine; aucun Dice utilis\u00e9",
   "excluded_centers": [
     "R032"
@@ -848,7 +848,6 @@
     "R065_sub-r065s015_ses-1",
     "R065_sub-r065s017_ses-1",
     "R065_sub-r065s018_ses-1",
-    "R065_sub-r065s019_ses-1",
     "R065_sub-r065s020_ses-1",
     "R065_sub-r065s021_ses-1",
     "R065_sub-r065s023_ses-1",
@@ -2355,7 +2354,6 @@
         "R065_sub-r065s015_ses-1",
         "R065_sub-r065s017_ses-1",
         "R065_sub-r065s018_ses-1",
-        "R065_sub-r065s019_ses-1",
         "R065_sub-r065s020_ses-1",
         "R065_sub-r065s021_ses-1",
         "R065_sub-r065s023_ses-1"
@@ -3238,7 +3236,6 @@
         "R065_sub-r065s015_ses-1",
         "R065_sub-r065s017_ses-1",
         "R065_sub-r065s018_ses-1",
-        "R065_sub-r065s019_ses-1",
         "R065_sub-r065s020_ses-1",
         "R065_sub-r065s021_ses-1",
         "R065_sub-r065s023_ses-1",
@@ -4330,7 +4327,6 @@
         "R065_sub-r065s015_ses-1",
         "R065_sub-r065s017_ses-1",
         "R065_sub-r065s018_ses-1",
-        "R065_sub-r065s019_ses-1",
         "R065_sub-r065s020_ses-1",
         "R065_sub-r065s021_ses-1",
         "R065_sub-r065s023_ses-1",
@@ -5474,7 +5470,6 @@
         "R065_sub-r065s015_ses-1",
         "R065_sub-r065s017_ses-1",
         "R065_sub-r065s018_ses-1",
-        "R065_sub-r065s019_ses-1",
         "R065_sub-r065s020_ses-1",
         "R065_sub-r065s021_ses-1",
         "R065_sub-r065s023_ses-1",
@@ -6606,7 +6601,6 @@
         "R065_sub-r065s015_ses-1",
         "R065_sub-r065s017_ses-1",
         "R065_sub-r065s018_ses-1",
-        "R065_sub-r065s019_ses-1",
         "R065_sub-r065s020_ses-1",
         "R065_sub-r065s021_ses-1",
         "R065_sub-r065s023_ses-1",
@@ -13900,12 +13894,6 @@
       "session": "ses-1"
     },
     {
-      "case_id": "R065_sub-r065s019_ses-1",
-      "subject": "sub-r065s019",
-      "site": "R065",
-      "session": "ses-1"
-    },
-    {
       "case_id": "R065_sub-r065s020_ses-1",
       "subject": "sub-r065s020",
       "site": "R065",
@@ -16055,6 +16043,21 @@
       "case_id": "R032_sub-r032s058_ses-1",
       "status": "excluded",
       "error": "R032_spacing_unreliable"
+    },
+    {
+      "case_id": "R065_sub-r065s019_ses-1",
+      "status": "excluded",
+      "error": "annotation_outside_image_support_and_crop"
     }
-  ]
+  ],
+  "revision": {
+    "date": "2026-11-11",
+    "reason": "technical_QC_quarantine_before_training",
+    "removed_cases": [
+      "R065_sub-r065s019_ses-1"
+    ],
+    "preserved": "centres OOD et affectation de chaque cas restant aux m\u00eames plis",
+    "review_status": "technical_review_completed; team_review_pending",
+    "source_sha256": "cc01a2522a90fd55d0284d4a85cd2935fb59df83de6d0af6ed6b778ee5a50359"
+  }
 }

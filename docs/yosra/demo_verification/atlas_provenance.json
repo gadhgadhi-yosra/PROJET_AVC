@@ -1,0 +1,25 @@
+{
+  "template": "MNI152NLin6Asym",
+  "resolution_mm": 2,
+  "atlas": "Harvard\u2013Oxford maxprob thr25",
+  "combination": "Labels corticaux prioritaires ; labels sous-corticaux +100 dans les autres voxels",
+  "sources": [
+    {
+      "file": "template.nii.gz",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-MNI152NLin6Asym/tpl-MNI152NLin6Asym_res-02_desc-brain_T1w.nii.gz",
+      "sha256": "d61f82b5b17ff0fffb19ddc1566da398cbc7dd335d97e7410f09e9caa0f7b0af"
+    },
+    {
+      "file": "HarvardOxford.tgz",
+      "url": "https://www.nitrc.org/frs/download.php/9902/HarvardOxford.tgz",
+      "sha256": "43f3cf29ea8b019d15247428c9a26569045f0637d5c40d144da821a6c324cfcf"
+    },
+    {
+      "file": "template_description.json",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-MNI152NLin6Asym/template_description.json",
+      "sha256": "4ae55cb140b6f3c38f5e48d50931d599c3bec49750173d8e2a589104e15acb07"
+    }
+  ],
+  "reference": "https://nilearn.github.io/stable/modules/generated/nilearn.datasets.fetch_atlas_harvard_oxford.html",
+  "registration_review_required": true
+}

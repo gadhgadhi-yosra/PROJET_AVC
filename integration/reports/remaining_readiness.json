@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-12T09:57:26.558102+00:00",
+  "mode": "audit",
+  "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1",
+  "experiments": {
+    "baseline_fold_0": {
+      "status": "missing",
+      "path": "data/predictions/c1_v2/results.csv"
+    },
+    "baseline_fold_1": {
+      "status": "missing",
+      "path": "data/predictions/c1_v2/results.csv"
+    },
+    "baseline_fold_2": {
+      "status": "missing",
+      "path": "data/predictions/c1_v2/results.csv"
+    },
+    "baseline_fold_3": {
+      "status": "missing",
+      "path": "data/predictions/c1_v2/results.csv"
+    },
+    "baseline_fold_4": {
+      "status": "missing",
+      "path": "data/predictions/c1_v2/results.csv"
+    }
+  },
+  "status": "inputs_required_or_failed",
+  "scope": "S7/S8 C1 uniquement ; aucune inférence, extraction réseau ou comparaison DANN simulée"
+}

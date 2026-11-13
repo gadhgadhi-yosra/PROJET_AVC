@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "date": "2026-11-11",
+  "scope": "Quarantaine technique avant entraînement ; ne modifie aucune annotation source",
+  "cases": [
+    {
+      "case_id": "R065_sub-r065s019_ses-1",
+      "reason": "annotation_outside_image_support_and_crop",
+      "evidence": "data/processed/pending_case_review.json",
+      "visual_evidence": "data/processed/pending_case_qc.png",
+      "lesion_voxels_after_resampling": 4376,
+      "voxels_outside_crop": 77,
+      "fraction_outside_crop": 0.017595978062157222,
+      "decision": "exclude_from_release_v2_pending_annotation_review",
+      "review_scope": "Contrôle technique image/masque, pas validation clinique ; relecture collective à effectuer"
+    }
+  ]
+}

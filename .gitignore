@@ -1,6 +1,11 @@
 .venv/
 .venv-spark/
 .venv-dl/
+.venv-demo/
+data/features/
+data/predictions/
+data/demo/
+demo/vendor/
 data/raw/
 .ipynb_checkpoints/
 
@@ -31,3 +36,8 @@ data/qc_s4/
 data/validation_s4/
 data/benchmark_s4/
 data/nnUNet_raw/
+
+.venv-integration/
+
+# Résultats individuels des analyses finales
+data/analysis/

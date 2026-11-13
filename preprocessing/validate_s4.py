@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import nibabel as nib
 import numpy as np
-from week4 import write_json
+from week4 import write_json, Z_STEP
 
 
 def validate(root):
@@ -22,10 +22,14 @@ def validate(root):
         if not np.isfinite(x).all() or not np.isin(y,[0,1]).all() or not np.isin(brain,[0,1]).all():raise ValueError('Invalid voxel data')
         support=brain>0
         mean,std=float(x[support].mean()),float(x[support].std())
-        if abs(mean)>1e-4 or abs(std-1)>1e-4 or np.any(x[~support]!=0):raise ValueError('Z-score/fond incorrect')
+        # L'arrondi int16 au pas Z_STEP peut déplacer moyenne et écart-type
+        # d'au plus Z_STEP/2, même si la normalisation float était exacte.
+        tolerance=Z_STEP/2+1e-6
+        if abs(mean)>tolerance or abs(std-1)>tolerance or np.any(x[~support]!=0):
+            raise ValueError(f'Z-score/fond incorrect : {folder.name}, mean={mean}, std={std}')
         if not np.isclose(y.sum()/1000,info['lesion_ml']):raise ValueError('QC volume differs')
         records.append(dict(mean=mean,std=std))
-    return dict(subjects=len(records),status='passed',checks=['finite','binary_masks','RAS','1mm','shared_grid','zero_background','brain_zscore','lesion_volume'],
+    return dict(subjects=len(records),status='passed',zscore_tolerance=Z_STEP/2+1e-6,checks=['finite','binary_masks','RAS','1mm','shared_grid','zero_background','brain_zscore','lesion_volume'],
                 max_abs_brain_mean=max(abs(r['mean']) for r in records),max_abs_std_error=max(abs(r['std']-1) for r in records))
 
 

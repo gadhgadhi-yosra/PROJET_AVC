@@ -25,7 +25,9 @@ def _as_scans(histograms):
 
 
 def _squared_distances(a, b):
-    return ((a[:, None, :] - b[None, :, :]) ** 2).sum(axis=2)
+    # Évite un temporaire n × m × 150 (plusieurs centaines de Mio par centre).
+    from scipy.spatial.distance import cdist
+    return cdist(a, b, metric='sqeuclidean')
 
 
 def _bandwidth(ref):
