@@ -81,3 +81,77 @@ def test_technique_inconnue(synthetic_c1, tmp_path):
     from adaptation.train import technique_hooks
     with pytest.raises(ValueError, match="Technique inconnue"):
         technique_hooks(tiny_config(synthetic_c1, tmp_path, "mixup"), ["R009"])
+
+
+# --- best.pt et garde-fou de divergence ---
+
+def test_dice_nan_ne_sauvegarde_pas_best(synthetic_c1, tmp_path, monkeypatch):
+    import adaptation.train as train_module
+    monkeypatch.setattr(train_module, "validate", lambda *args, **kwargs: float("nan"))
+    cfg = tiny_config(synthetic_c1, tmp_path)
+    _, summary = train(cfg)
+    output = tmp_path / cfg.name
+    assert not (output / "best.pt").exists() and (output / "last.pt").is_file()
+    assert summary["entrainement"]["best_dice"] == float("-inf") and summary["entrainement"]["best_iteration"] is None
+
+
+def test_best_exige_dice_et_poids_finis(synthetic_c1, tmp_path, monkeypatch):
+    import adaptation.train as train_module
+    from adaptation.train import finite_parameters, improves
+    assert improves(0.0, float("-inf")) and not improves(float("nan"), float("-inf"))
+    assert not improves(float("inf"), 0.5) and not improves(0.4, 0.5)
+    model = torch.nn.Linear(2, 1)
+    assert finite_parameters(model)
+    with torch.no_grad():
+        model.weight[0, 0] = float("nan")
+    assert not finite_parameters(model)
+    # Dice fini (0,3) mais poids devenus NaN au moment de la validation : pas de best.pt, puis arrêt.
+    def poisoned_validate(model, *args, **kwargs):
+        with torch.no_grad():
+            next(model.parameters()).fill_(float("nan"))
+        return 0.3
+
+    monkeypatch.setattr(train_module, "validate", poisoned_validate)
+    cfg = tiny_config(synthetic_c1, tmp_path)  # validation à l'itération 2
+    with pytest.raises(train_module.TrainingDiverged, match="Itération 3 : perte non finie"):
+        train(cfg)
+    assert not (tmp_path / cfg.name / "best.pt").exists()
+
+
+def test_garde_fou():
+    from adaptation.train import DivergenceGuard, TrainingDiverged
+    model = torch.nn.Linear(2, 1)
+    guard = DivergenceGuard(max_skipped=50)
+    with pytest.raises(TrainingDiverged, match="perte non finie"):
+        guard.check(7, float("nan"), model, skipped=False)
+    for iteration in range(50):
+        guard.check(iteration, 0.5, model, skipped=True)
+    guard.check(50, 0.5, model, skipped=False)  # un pas appliqué remet le compteur à zéro
+    assert guard.consecutive_skipped == 0 and guard.skipped == 50
+    for iteration in range(50):
+        guard.check(iteration, 0.5, model, skipped=True)
+    with pytest.raises(TrainingDiverged, match="51 pas sautés d'affilée"):
+        guard.check(101, 0.5, model, skipped=True)
+    with torch.no_grad():
+        model.bias.fill_(float("inf"))
+    with pytest.raises(TrainingDiverged, match="poids non finis"):
+        DivergenceGuard().check(3, 0.5, model, skipped=False)
+
+
+class NaNOutput(torch.nn.Module):
+    """Réseau dont la sortie est NaN : la perte l'est aussi dès la première itération."""
+
+    def __init__(self, network):
+        super().__init__()
+        self.network = network
+
+    def forward(self, x):
+        return self.network(x) * float("nan")
+
+
+def test_entrainement_arrete_sur_perte_nan(synthetic_c1, tmp_path):
+    from adaptation.train import TrainingDiverged
+    cfg = tiny_config(synthetic_c1, tmp_path)
+    with pytest.raises(TrainingDiverged, match="Itération 1 : perte non finie"):
+        train(cfg, wrap_model=NaNOutput)
+    assert not (tmp_path / cfg.name / "best.pt").exists()

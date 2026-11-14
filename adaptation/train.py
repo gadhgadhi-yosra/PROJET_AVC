@@ -369,6 +369,44 @@ def validate(model, records, cfg, test_transform):
     return float(np.mean(dice)) if dice else float("nan")
 
 
+class TrainingDiverged(RuntimeError):
+    """Entraînement arrêté : perte ou poids non finis, ou trop de pas sautés d'affilée par le GradScaler."""
+
+
+def finite_parameters(model):
+    """True si tous les paramètres du modèle sont finis (ni NaN ni Inf)."""
+    return all(bool(torch.isfinite(p).all()) for p in model.parameters())
+
+
+def improves(dice, best):
+    """Un Dice NaN ou infini n'est jamais une amélioration (le meilleur initial vaut -inf)."""
+    return math.isfinite(dice) and dice > best
+
+
+class DivergenceGuard:
+    """Arrêt immédiat si la perte ou les poids ne sont pas finis, ou après `max_skipped` pas sautés d'affilée.
+
+    Un pas sauté (GradScaler qui baisse son échelle) ne modifie pas les poids ; une série de pas sautés
+    signifie que l'entraînement est bloqué (échelle qui s'effondre vers 0).
+    """
+
+    def __init__(self, max_skipped=50):
+        self.max_skipped = max_skipped
+        self.consecutive_skipped = 0
+        self.skipped = 0
+
+    def check(self, iteration, loss, model, skipped):
+        if not math.isfinite(loss):
+            raise TrainingDiverged(f"Itération {iteration} : perte non finie ({loss}) ; arrêt de l'entraînement")
+        if not finite_parameters(model):
+            raise TrainingDiverged(f"Itération {iteration} : poids non finis après la mise à jour ; arrêt de l'entraînement")
+        self.skipped += int(skipped)
+        self.consecutive_skipped = self.consecutive_skipped + 1 if skipped else 0
+        if self.consecutive_skipped > self.max_skipped:
+            raise TrainingDiverged(f"Itération {iteration} : {self.consecutive_skipped} pas sautés d'affilée par le "
+                                   f"GradScaler (gradients non finis) ; arrêt de l'entraînement")
+
+
 def save_checkpoint(path, model, optimizer, scaler, state, cfg):
     torch.save(dict(model=model.state_dict(), optimizer=optimizer.state_dict(), scaler=scaler.state_dict(),
                     state=state, config=asdict(cfg)), path)
@@ -406,7 +444,8 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
     seg_loss = DiceCELoss(sigmoid=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay)
     scaler = torch.amp.GradScaler(device.type, enabled=cfg.amp and device.type == "cuda")
-    state = dict(iteration=0, elapsed=0.0, best_dice=-1.0, best_iteration=None)
+    state = dict(iteration=0, elapsed=0.0, best_dice=-math.inf, best_iteration=None)
+    guard = DivergenceGuard()
     if resume and (output / "last.pt").is_file():
         checkpoint = torch.load(output / "last.pt", map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model"])
@@ -446,9 +485,11 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
                 parts.update(extra_parts)
         optimizer.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
+        scale = scaler.get_scale()
         scaler.step(optimizer)
         scaler.update()
         state["iteration"] += 1
+        guard.check(state["iteration"], float(loss.detach()), model, skipped=scaler.get_scale() < scale)
         running.append((float(loss.detach()), parts))
         if state["iteration"] % cfg.log_every == 0:
             now = time.time()
@@ -462,7 +503,7 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
         if state["iteration"] % cfg.validate_every == 0:
             state["elapsed"] = time.time() - started
             dice = validate(model, validation_records, cfg, test_transform) if len(validation_records) else float("nan")
-            if not math.isnan(dice) and dice > state["best_dice"]:
+            if improves(dice, state["best_dice"]) and finite_parameters(model):
                 state.update(best_dice=dice, best_iteration=state["iteration"])
                 save_checkpoint(output / "best.pt", model, optimizer, scaler, state, cfg)
             mean = lambda key: np.mean([p.get(key, np.nan) for _, p in running]) if running else np.nan  # noqa: E731
@@ -481,12 +522,15 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
             last_checkpoint = time.time()
     state["elapsed"] = time.time() - started
     save_checkpoint(output / "last.pt", model, optimizer, scaler, state, cfg)
-    if not (output / "best.pt").is_file():  # pas de validation (entraînement final) : le dernier modèle
-        save_checkpoint(output / "best.pt", model, optimizer, scaler, state, cfg)
+    if not len(validation_records) and not (output / "best.pt").is_file():
+        save_checkpoint(output / "best.pt", model, optimizer, scaler, state, cfg)  # entraînement final : le dernier
     print(f"Entraînement terminé : {state['iteration']} itérations, {state['elapsed'] / 3600:.2f} h, "
           f"meilleur Dice de validation {state['best_dice']:.4f} (itération {state['best_iteration']})")
-    best = torch.load(output / "best.pt", map_location=device, weights_only=False)
-    model.load_state_dict(best["model"])
+    if (output / "best.pt").is_file():
+        best = torch.load(output / "best.pt", map_location=device, weights_only=False)
+        model.load_state_dict(best["model"])
+    else:
+        print("Aucune validation avec un Dice fini : pas de best.pt, évaluation du dernier modèle")
     return model, run_evaluation(model, cfg, output, test_transform, state=state)
 
 
