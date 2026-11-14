@@ -9,6 +9,7 @@ le dépôt devient privé. Les données viennent du dataset privé `atlas-c1-pro
 import argparse
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -122,9 +123,14 @@ for path in sorted(Path("/kaggle/working/runs/{run}").glob("resume*.json")):
 DIAG = ("06_diag_nan", "rq3-diag-nan")
 
 
-def diag_notebook():
-    """Diagnostic des NaN de la baseline : adaptation/diag_nan.py, variantes A à D, 1 000 itérations au plus."""
+def diag_notebook(commit=None):
+    """Diagnostic des NaN de la baseline : adaptation/diag_nan.py, variantes A à D, 1 000 itérations au plus.
+
+    commit : hash attendu dans VERSION.json du dataset de code ; la cellule de contrôle arrête le notebook
+    avant les variantes s'il diffère (copie poussée sur Kaggle uniquement).
+    """
     setup = notebook(*RUNS[0])["cells"][1:3]  # code du dataset, dépendances, liens vers les données C1
+    check = f'assert version["commit"] == "{commit}", f"Code {{version[\'commit\']}} au lieu de {commit}"' if commit else ""
     cells = [
         markdown(f"""
 # RQ3 — Diagnostic des NaN de la baseline (pli {FOLD}, graine {SEED})
@@ -134,7 +140,19 @@ au plus par variante, journal par itération. A = baseline (fp16, Dice par patch
 B = fp32, C = Dice sur le lot, D = unscale_ + clip_grad_norm_(12) + warmup sur 500 itérations.
 Au premier poids ou moment non fini : lot, état avant le pas et gradients du pas dans `diag_nan/<variante>/rupture/`.
 """),
+        code("""
+# Environnement (baseline : torch 2.11.0+cu130 sur Tesla T4) ; un écart est signalé dans resume.json sans arrêter.
+import torch
+print("torch", torch.__version__, "| CUDA", torch.version.cuda, "| GPU",
+      torch.cuda.get_device_name(0) if torch.cuda.is_available() else "aucun")
+"""),
         *setup,
+        code(f"""
+# Version du code (VERSION.json du dataset projet-avc-code), contrôlée avant de lancer les variantes.
+version = json.loads((REPO / "VERSION.json").read_text())
+print("Commit du code :", version["commit"], "-", version["message"])
+{check}
+"""),
         code("""
 # Diagnostic : les quatre variantes l'une après l'autre ; sortie complète aussi dans diag_nan/diag_nan.log.
 !mkdir -p /kaggle/working/diag_nan && cd {REPO} && python -u -m adaptation.diag_nan --data-root {DATA} --output /kaggle/working/diag_nan --num-workers 4 2>&1 | tee /kaggle/working/diag_nan/diag_nan.log
@@ -173,15 +191,24 @@ def main():
     jobs.append((DIAG[0], diag_notebook(), diag_metadata()))
     for name, content, metadata in jobs:
         path = HERE / f"{name}.ipynb"
-        with open(path, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(content, handle, ensure_ascii=False, indent=1)
-            handle.write("\n")
+        write_notebook(path, content)
         print(path)
         if args.kernels_dir:
             folder = args.kernels_dir / name
             folder.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, folder / path.name)
             (folder / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    if args.kernels_dir:  # copie poussée sur Kaggle : contrôle du commit attendu (HEAD, celui du dataset de code)
+        commit = subprocess.run(["git", "-C", str(HERE), "rev-parse", "--short", "HEAD"], check=True,
+                                capture_output=True, text=True).stdout.strip()
+        write_notebook(args.kernels_dir / DIAG[0] / f"{DIAG[0]}.ipynb", diag_notebook(commit))
+        print(f"{DIAG[0]} (Kaggle) : commit attendu {commit}")
+
+
+def write_notebook(path, content):
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(content, handle, ensure_ascii=False, indent=1)
+        handle.write("\n")
 
 
 if __name__ == "__main__":

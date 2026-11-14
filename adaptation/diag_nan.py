@@ -50,6 +50,17 @@ VARIANTS = {
 PROBES = {"conv1": "model.0.conv.unit0.conv", "norm1": "model.0.conv.unit0.adn.N", "act1": "model.0.conv.unit0.adn.A",
           "norm2": "model.0.conv.unit1.adn.N", "norm3": "model.1.submodule.0.conv.unit0.adn.N"}
 KINDS = ("perte", "logits", "gradient", "poids", "exp_avg", "exp_avg_sq")
+# Environnement de la run baseline rq3-baseline-pli0 : un écart est signalé dans le résumé, sans arrêter.
+BASELINE_ENVIRONMENT = dict(torch="2.11.0+cu130", gpu="Tesla T4")
+
+
+def environment_warnings(environment):
+    warnings = []
+    if environment["torch"] != BASELINE_ENVIRONMENT["torch"]:
+        warnings.append(f"torch {environment['torch']} au lieu de {BASELINE_ENVIRONMENT['torch']} (baseline)")
+    if BASELINE_ENVIRONMENT["gpu"] not in environment["gpu"]:
+        warnings.append(f"GPU {environment['gpu']} au lieu de {BASELINE_ENVIRONMENT['gpu']} (baseline)")
+    return warnings
 
 
 class DiagDataset(PatchDataset):
@@ -327,16 +338,24 @@ def main():
     import monai
     environment = dict(torch=torch.__version__, cuda=torch.version.cuda, cudnn=torch.backends.cudnn.version(),
                        gpu=torch.cuda.get_device_name(0), monai=monai.__version__, python=platform.python_version())
+    version_file = Path(__file__).resolve().parents[1] / "VERSION.json"
+    code_version = json.loads(version_file.read_text(encoding="utf-8")) if version_file.is_file() else None
+    warnings = environment_warnings(environment)
     print(environment, flush=True)
+    print("Code :", code_version, flush=True)
+    for warning in warnings:
+        print("ATTENTION :", warning, flush=True)
     summaries = []
     for name in args.variants:
         print(f"=== Variante {name} : {VARIANTS[name]['description']}", flush=True)
         summaries.append(run_variant(name, VARIANTS[name], cfg, output, args.iterations, args.minutes_per_variant * 60))
-        report = dict(environnement=environment, config=asdict(cfg), iterations_max=args.iterations,
+        report = dict(environnement=environment, environnement_baseline=BASELINE_ENVIRONMENT,
+                      avertissements=warnings, code=code_version, config=asdict(cfg), iterations_max=args.iterations,
                       sondes=PROBES, variantes=summaries)
         (output / "resume.json").write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str),
                                             encoding="utf-8")
     print("\n=== Résumé")
+    print("Environnement :", "identique à la baseline (torch, GPU)" if not warnings else "; ".join(warnings))
     for summary in summaries:
         first = ", ".join(f"{kind} à {it}" for kind, it in sorted(summary["premiers_non_finis"].items(),
                                                                   key=lambda item: item[1])) or "aucun"
