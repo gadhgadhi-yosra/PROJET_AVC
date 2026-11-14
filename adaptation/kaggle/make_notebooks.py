@@ -119,6 +119,41 @@ for path in sorted(Path("/kaggle/working/runs/{run}").glob("resume*.json")):
             "nbformat": 4, "nbformat_minor": 5}
 
 
+DIAG = ("06_diag_nan", "rq3-diag-nan")
+
+
+def diag_notebook():
+    """Diagnostic des NaN de la baseline : adaptation/diag_nan.py, variantes A à D, 1 000 itérations au plus."""
+    setup = notebook(*RUNS[0])["cells"][1:3]  # code du dataset, dépendances, liens vers les données C1
+    cells = [
+        markdown(f"""
+# RQ3 — Diagnostic des NaN de la baseline (pli {FOLD}, graine {SEED})
+
+`adaptation/diag_nan.py` : même réseau, mêmes données, même pli et même graine que la baseline, 1 000 itérations
+au plus par variante, journal par itération. A = baseline (fp16, Dice par patch, sans clipping ni warmup),
+B = fp32, C = Dice sur le lot, D = unscale_ + clip_grad_norm_(12) + warmup sur 500 itérations.
+Au premier poids ou moment non fini : lot, état avant le pas et gradients du pas dans `diag_nan/<variante>/rupture/`.
+"""),
+        *setup,
+        code("""
+# Diagnostic : les quatre variantes l'une après l'autre ; sortie complète aussi dans diag_nan/diag_nan.log.
+!mkdir -p /kaggle/working/diag_nan && cd {REPO} && python -u -m adaptation.diag_nan --data-root {DATA} --output /kaggle/working/diag_nan --num-workers 4 2>&1 | tee /kaggle/working/diag_nan/diag_nan.log
+"""),
+        code("""
+# Fichiers à récupérer (onglet Output).
+print((Path("/kaggle/working/diag_nan") / "resume.json").read_text())
+!find /kaggle/working/diag_nan -type f -exec ls -la {} +
+"""),
+    ]
+    return {**notebook(*RUNS[0]), "cells": cells}
+
+
+def diag_metadata():
+    name, slug = DIAG
+    return {**kernel_metadata(name, "baseline"), "id": f"{USERNAME}/{slug}", "title": slug,
+            "code_file": f"{name}.ipynb"}
+
+
 def kernel_metadata(name, technique):
     """Métadonnées de `kaggle kernels push` : notebook privé, GPU, Internet, les deux datasets privés."""
     slug = f"rq3-{technique.replace('_', '-')}-pli{FOLD}"
@@ -133,18 +168,20 @@ def main():
     parser.add_argument("--kernels-dir", type=Path,
                         help="écrit aussi un dossier par notebook avec kernel-metadata.json (kaggle kernels push)")
     args = parser.parse_args()
-    for name, technique, title, duration in RUNS:
+    jobs = [(name, notebook(name, technique, title, duration), kernel_metadata(name, technique))
+            for name, technique, title, duration in RUNS]
+    jobs.append((DIAG[0], diag_notebook(), diag_metadata()))
+    for name, content, metadata in jobs:
         path = HERE / f"{name}.ipynb"
         with open(path, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(notebook(name, technique, title, duration), handle, ensure_ascii=False, indent=1)
+            json.dump(content, handle, ensure_ascii=False, indent=1)
             handle.write("\n")
         print(path)
         if args.kernels_dir:
             folder = args.kernels_dir / name
             folder.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, folder / path.name)
-            (folder / "kernel-metadata.json").write_text(json.dumps(kernel_metadata(name, technique), indent=2) + "\n",
-                                                         encoding="utf-8")
+            (folder / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
