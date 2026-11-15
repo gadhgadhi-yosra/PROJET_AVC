@@ -77,12 +77,15 @@ class RunConfig:
     # n'est qu'un garde-fou pour tenir dans une session Kaggle de 12 h avec l'évaluation.
     max_iterations: int | None = 40000
     time_budget_hours: float = 10.0
-    validate_every: int = 4000              # itérations
-    log_every: int = 500                    # ligne de progression (durée par itération, temps restant)
+    validate_every: int = 2000              # itérations
+    log_every: int = 100                    # ligne de progression (durée par itération, temps restant)
     validation_limit: int | None = None     # sujets de validation (None : tous)
     checkpoint_minutes: float = 20.0
     num_workers: int = 4
-    amp: bool = True
+    # fp32 par défaut : en fp16 (autocast + GradScaler), la passe avant de la baseline donne des patchs entiers
+    # NaN dès ~170 itérations et l'échelle du scaler s'effondre (diagnostic rq3-diag-nan, variantes A à D).
+    amp: bool = False
+    grad_clip: float | None = 12.0          # norme globale des gradients (None : pas de clipping)
     dann_weight: float = 1.0
     dann_gamma: float = 10.0
     sw_overlap: float = 0.25
@@ -486,6 +489,9 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
         optimizer.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         scale = scaler.get_scale()
+        if cfg.grad_clip:
+            scaler.unscale_(optimizer)  # sans effet en fp32 (scaler inactif) ; indispensable avec --amp
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         scaler.step(optimizer)
         scaler.update()
         state["iteration"] += 1
@@ -572,13 +578,13 @@ def main():
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--time-budget-hours", type=float, default=10.0, help="garde-fou (session Kaggle de 12 h)")
     parser.add_argument("--max-iterations", type=int, default=40000, help="identique pour toutes les techniques")
-    parser.add_argument("--validate-every", type=int, default=4000)
-    parser.add_argument("--log-every", type=int, default=500, help="ligne de progression toutes les N itérations")
+    parser.add_argument("--validate-every", type=int, default=2000)
+    parser.add_argument("--log-every", type=int, default=100, help="ligne de progression toutes les N itérations")
     parser.add_argument("--validation-limit", type=int)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--patches-per-volume", type=int, default=2)
     parser.add_argument("--volumes-per-batch", type=int, default=2)
-    parser.add_argument("--no-amp", action="store_true")
+    parser.add_argument("--amp", action="store_true", help="fp16 (autocast + GradScaler) ; défaut fp32, voir RunConfig.amp")
     parser.add_argument("--resume", action="store_true", help="reprend depuis last.pt (session Kaggle interrompue)")
     parser.add_argument("--smoke", action="store_true", help="essai rapide : petit réseau, 4 sujets, 20 itérations")
     parser.add_argument("--evaluate-only", action="store_true")
@@ -602,7 +608,7 @@ def main():
                     time_budget_hours=args.time_budget_hours, max_iterations=args.max_iterations,
                     validate_every=args.validate_every, log_every=args.log_every, validation_limit=args.validation_limit,
                     num_workers=args.num_workers, patches_per_volume=args.patches_per_volume,
-                    volumes_per_batch=args.volumes_per_batch, amp=not args.no_amp,
+                    volumes_per_batch=args.volumes_per_batch, amp=args.amp,
                     evaluation_limit=args.evaluation_limit)
     if args.smoke:
         cfg = smoke_config(cfg)

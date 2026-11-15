@@ -18,12 +18,12 @@ DATASET = "atlas-c1-processed"
 CODE_DATASET = "projet-avc-code"
 FOLD, SEED = 0, 2026
 RUNS = [  # fichier, technique, titre, durée estimée sur une T4 (entraînement + validation + évaluation)
-    ("00_baseline", "baseline", "Baseline (aucune technique de généralisation), puis TENT au test", "2 à 3 h"),
-    ("01_intensite", "intensity", "Augmentation d'intensité (gamma, contraste, bruit, flou, biais, basse résolution)", "3 à 4 h"),
-    ("02_bigaug", "bigaug", "Preset BigAug", "4 à 6 h"),
-    ("03_fda", "fda", "FDA (échange d'amplitude basse fréquence)", "4 à 6 h"),
-    ("04_histogram_matching", "histogram_matching", "Histogram matching (aussi appliqué à la validation et au test)", "3 à 5 h"),
-    ("05_dann", "dann", "DANN (classifieur de centre et inversion de gradient)", "2 à 3 h"),
+    ("00_baseline", "baseline", "Baseline (aucune technique de généralisation), puis TENT au test", "6 h 30 à 7 h 30"),
+    ("01_intensite", "intensity", "Augmentation d'intensité (gamma, contraste, bruit, flou, biais, basse résolution)", "6 h 30 à 7 h"),
+    ("02_bigaug", "bigaug", "Preset BigAug", "6 h 30 à 7 h"),
+    ("03_fda", "fda", "FDA (échange d'amplitude basse fréquence)", "7 à 9 h"),
+    ("04_histogram_matching", "histogram_matching", "Histogram matching (aussi appliqué à la validation et au test)", "7 à 7 h 30"),
+    ("05_dann", "dann", "DANN (classifieur de centre et inversion de gradient)", "6 h 30 à 7 h"),
 ]
 
 
@@ -42,7 +42,7 @@ def notebook(name, technique, title, duration):
         markdown(f"""
 # RQ3 — {title}
 
-Run `{run}` du tableau d'ablation : UNet MONAI 3D, patches de 96³, **pli {FOLD}** de `splits.json`, **graine {SEED}**,
+Run `{run}` du tableau d'ablation : UNet MONAI 3D en fp32 (clipping des gradients à 12), patches de 96³, **pli {FOLD}** de `splits.json`, **graine {SEED}**,
 40 000 itérations (lots de 4 patches), identiques pour toutes les techniques. Durée estimée sur une T4 : {duration}
 (garde-fou à 10 h d'entraînement, session limitée à 12 h).
 
@@ -101,7 +101,7 @@ assert digest(next(INPUT.rglob("splits.json"))) == digest(REPO / "splits.json"),
         code(f"""
 # Entraînement, validation sur le pli, puis évaluation sur le test ID du pli et le test OOD.
 # Session interrompue : rattacher la sortie précédente, copier last.pt dans /kaggle/working/runs/{run}/ et ajouter --resume.
-!cd {{REPO}} && python -u -m adaptation.train --technique {technique} --fold {FOLD} --seed {SEED} --data-root {{DATA}} --output /kaggle/working/runs --num-workers 4 --log-every 500
+!cd {{REPO}} && python -u -m adaptation.train --technique {technique} --fold {FOLD} --seed {SEED} --data-root {{DATA}} --output /kaggle/working/runs --num-workers 4 --validate-every 2000 --log-every 100
 """),
     ]
     if technique == "baseline":

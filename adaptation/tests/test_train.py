@@ -155,3 +155,25 @@ def test_entrainement_arrete_sur_perte_nan(synthetic_c1, tmp_path):
     with pytest.raises(TrainingDiverged, match="Itération 1 : perte non finie"):
         train(cfg, wrap_model=NaNOutput)
     assert not (tmp_path / cfg.name / "best.pt").exists()
+
+
+def test_fp32_et_clipping_par_defaut(synthetic_c1, tmp_path, monkeypatch):
+    defaults = RunConfig()
+    assert defaults.amp is False and defaults.grad_clip == 12.0
+    assert defaults.validate_every == 2000 and defaults.log_every == 100
+    calls = []
+    original = torch.nn.utils.clip_grad_norm_
+
+    def spy(parameters, max_norm, *args, **kwargs):
+        calls.append(max_norm)
+        return original(parameters, max_norm, *args, **kwargs)
+
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", spy)
+    cfg = tiny_config(synthetic_c1, tmp_path)
+    cfg.grad_clip = 12.0
+    train(cfg)
+    assert calls == [12.0] * cfg.max_iterations
+    calls.clear()
+    cfg.grad_clip = None
+    train(cfg)
+    assert calls == []
