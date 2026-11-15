@@ -34,9 +34,11 @@ RUNS = [  # fichier, technique, titre, durée estimée sur une T4 Kaggle (entra�
     ("04_histogram_matching", "histogram_matching", "Histogram matching (aussi appliqué à la validation et au test)", "7 à 7 h 30"),
     ("05_dann", "dann", "DANN (classifieur de centre et inversion de gradient)", "6 h 30 à 7 h"),
 ]
-COLAB_DURATIONS = {"intensity": "7 h 30 à 9 h", "bigaug": "9 à 10 h 30", "histogram_matching": "8 à 9 h 30"}
+COLAB_DURATIONS = {"dann": "7 à 8 h 30", "intensity": "10 h 30 à 11 h 30 (au-delà du garde-fou de 10 h)",
+                   "bigaug": "plus de 11 h (au-delà du garde-fou de 10 h)", "histogram_matching": "10 à 11 h"}
 # Répartition : Kaggle (compte du propriétaire, 2 sessions GPU) et Google Colab (1 session, reprise sur Drive).
-ASSIGNMENT = {"kaggle": ["baseline", "fda", "dann"], "colab": ["intensity", "bigaug", "histogram_matching"]}
+# Colab (2 processeurs) mesuré à 0,80-0,87 s/it pour l'intensité : DANN, la moins coûteuse à préparer, y passe.
+ASSIGNMENT = {"kaggle": ["baseline", "fda", "intensity"], "colab": ["dann", "bigaug", "histogram_matching"]}
 SLUGS = {"baseline": f"rq3-baseline-fp32-pli{FOLD}"}
 CONTINUAL = ("07_adaptation_continue", f"rq3-adaptation-continue-pli{FOLD}")
 
@@ -464,6 +466,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--kernels-dir", type=Path, help="dossiers kaggle kernels push (runs Kaggle)")
     parser.add_argument("--colab-dir", type=Path, help="notebooks Google Colab (<slug>.ipynb)")
+    parser.add_argument("--commit", help="commit attendu dans VERSION.json (défaut : HEAD) ; celui du dataset de code")
     args = parser.parse_args()
     for name, technique, title, duration in RUNS:
         write_notebook(HERE / f"{name}.ipynb", notebook(name, technique, title, duration))
@@ -472,8 +475,8 @@ def main():
     print("Notebooks de référence :", HERE)
     if not (args.kernels_dir or args.colab_dir):
         return
-    commit = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short", "HEAD"],
-                            check=True, capture_output=True, text=True).stdout.strip()
+    commit = args.commit or subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short",
+                                            "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     by_technique = {technique: (name, title, duration) for name, technique, title, duration in RUNS}
     if args.kernels_dir:
         for technique in ASSIGNMENT["kaggle"]:

@@ -105,17 +105,20 @@ def test_fichiers_generes(tmp_path, monkeypatch):
                                       "--colab-dir", str(tmp_path / "c")])
     mk.main()
     colab = sorted(path.name for path in (tmp_path / "c").glob("*.ipynb"))
-    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-bigaug-pli0.ipynb",
-                     "rq3-histogram-matching-pli0.ipynb", "rq3-intensity-pli0.ipynb"]
+    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-bigaug-pli0.ipynb", "rq3-dann-pli0.ipynb",
+                     "rq3-histogram-matching-pli0.ipynb"]
     kernels = {path.parent.name: json.loads(path.read_text()) for path in (tmp_path / "k").rglob("kernel-metadata.json")}
-    assert set(kernels) == {"03_fda", "05_dann", "07_adaptation_continue"}
-    assert kernels["05_dann"]["id"] == "fayfahachicha/rq3-dann-pli0"
+    assert set(kernels) == {"01_intensite", "03_fda", "07_adaptation_continue"}
+    assert kernels["01_intensite"]["id"] == "fayfahachicha/rq3-intensity-pli0"
     assert kernels["07_adaptation_continue"]["kernel_sources"] == ["fayfahachicha/rq3-baseline-fp32-pli0"]
     kaggle_cells = "".join(map("".join, (c["source"] for c in json.loads(
-        (tmp_path / "k" / "05_dann" / "05_dann.ipynb").read_text(encoding="utf-8"))["cells"])))
+        (tmp_path / "k" / "01_intensite" / "01_intensite.ipynb").read_text(encoding="utf-8"))["cells"])))
     assert "--resume\"]" not in kaggle_cells and "google.colab" not in kaggle_cells  # Kaggle : comme avant
-    colab_notebook = json.loads((tmp_path / "c" / "rq3-intensity-pli0.ipynb").read_text(encoding="utf-8"))
+    colab_notebook = json.loads((tmp_path / "c" / "rq3-dann-pli0.ipynb").read_text(encoding="utf-8"))
+    colab_source = "".join(map("".join, (c["source"] for c in colab_notebook["cells"])))
     assert colab_notebook["metadata"]["accelerator"] == "GPU"
+    assert '"--technique", "dann"' in colab_source and '"--num-workers", "4"' in colab_source
+    assert '"--resume"]' in colab_source
 
 
 @pytest.fixture
