@@ -32,6 +32,7 @@ prédictions doivent rester sous `data/` dans les dossiers ignorés par Git.
 | S5–S6 | [Statistiques et empreinte](analysis/README.md) |
 | S7–S10 | [Analyses Dice, temps et représentations](analysis/ANALYSES_S7_S10.md) |
 | S8–S12 | [Démo Gradio, NiiVue, atlas et Docker](demo/README.md) |
+| Tout le projet | [Frontend web : tableau de bord + démo IRM](frontend/README.md) |
 | S12–S14 | [Rapport](docs/yosra/RAPPORT.md), [oral et répétitions](docs/yosra/SOUTENANCE.md) |
 
 Le code S7–S10 peut être testé sans modèle, mais ses résultats scientifiques exigent
