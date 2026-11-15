@@ -177,3 +177,80 @@ def test_fp32_et_clipping_par_defaut(synthetic_c1, tmp_path, monkeypatch):
     cfg.grad_clip = None
     train(cfg)
     assert calls == []
+
+
+# --- Reprise exacte (sessions coupées) ---
+
+class Interruption(RuntimeError):
+    pass
+
+
+@pytest.mark.parametrize("technique, workers", [("baseline", 0), ("baseline", 2), ("intensity", 2)])
+def test_reprise_meme_trajectoire(synthetic_c1, tmp_path, monkeypatch, technique, workers):
+    """Coupure après l'itération 4 (last.pt à 3), reprise : mêmes poids finaux qu'une run sans coupure."""
+    import adaptation.train as train_module
+    import types
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)  # CPU : calcul déterministe, comparaison exacte
+    # Horloge figée : le LR de la première itération dépend sinon de quelques secondes d'horloge
+    # (progress = max(temps / budget, itération / max)), y compris entre deux runs sans coupure.
+    clock = types.SimpleNamespace(time=lambda: 1000.0, perf_counter=train_module.time.perf_counter)
+    monkeypatch.setattr(train_module, "time", clock)
+
+    def config(folder):
+        cfg = tiny_config(synthetic_c1, tmp_path / folder, technique)
+        cfg.max_iterations, cfg.validate_every, cfg.num_workers, cfg.checkpoint_minutes = 6, 3, workers, -1.0
+        cfg.evaluation_splits = ()
+        return cfg
+
+    straight = config("continu")
+    train(straight)
+    original_check = train_module.DivergenceGuard.check
+
+    def crash(self, iteration, *args, **kwargs):
+        if iteration == 4:
+            raise Interruption("coupure simulée")
+        return original_check(self, iteration, *args, **kwargs)
+
+    resumed = config("coupe")
+    monkeypatch.setattr(train_module.DivergenceGuard, "check", crash)
+    with pytest.raises(Interruption):
+        train(resumed)
+    monkeypatch.setattr(train_module.DivergenceGuard, "check", original_check)
+    interrupted = torch.load(tmp_path / "coupe" / resumed.name / "last.pt", weights_only=False)
+    assert interrupted["state"]["iteration"] == 3 and len(interrupted["reprise"]["rng_lots"]) == max(workers, 1)
+    train(resumed, resume=True)
+    a = torch.load(tmp_path / "continu" / straight.name / "last.pt", weights_only=False)
+    b = torch.load(tmp_path / "coupe" / resumed.name / "last.pt", weights_only=False)
+    assert a["state"]["iteration"] == b["state"]["iteration"] == 6
+    for key in a["model"]:
+        assert torch.equal(a["model"][key], b["model"][key]), key
+    assert a["state"]["best_iteration"] == b["state"]["best_iteration"]
+
+
+def test_echantillonneur_identique_a_randomsampler():
+    from adaptation.train import ResumableSampler
+    data = list(range(7))
+    reference = list(torch.utils.data.RandomSampler(data, replacement=True, num_samples=100,
+                                                    generator=torch.Generator().manual_seed(2026)))
+    assert list(ResumableSampler(data, 100, 2026)) == reference
+    assert list(ResumableSampler(data, 100, 2026, start=37)) == reference[37:]
+
+
+def test_sauvegarde_atomique(tmp_path, monkeypatch):
+    """Une coupure pendant l'écriture laisse l'ancien checkpoint lisible."""
+    import adaptation.train as train_module
+    model = torch.nn.Linear(2, 1)
+    optimizer = torch.optim.AdamW(model.parameters())
+    scaler = torch.amp.GradScaler("cpu", enabled=False)
+    path = tmp_path / "last.pt"
+    train_module.save_checkpoint(path, model, optimizer, scaler, dict(iteration=1), RunConfig())
+
+    def broken_save(obj, target):
+        open(target, "wb").write(b"tronque")
+        raise OSError("coupure")
+
+    monkeypatch.setattr(torch, "save", broken_save)
+    with pytest.raises(OSError):
+        train_module.save_checkpoint(path, model, optimizer, scaler, dict(iteration=2), RunConfig())
+    monkeypatch.undo()
+    assert torch.load(path, weights_only=False)["state"]["iteration"] == 1

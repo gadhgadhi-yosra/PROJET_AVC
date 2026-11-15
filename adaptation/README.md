@@ -35,7 +35,7 @@ Techniques : `baseline`, `intensity`, `bigaug`, `fda`, `histogram_matching`, `da
 | Lot | 2 volumes × 2 patches |
 | Perte | `DiceCELoss(sigmoid=True)` (+ perte du centre pour DANN) |
 | Optimisation | AdamW, taux 1e-3, décroissance polynomiale (puissance 0,9), précision mixte |
-| Durée | **40 000 itérations pour toutes les techniques** ; budget de 10 h comme garde-fou ; reprise avec `--resume` |
+| Durée | **40 000 itérations pour toutes les techniques** ; budget de 10 h comme garde-fou ; reprise exacte avec `--resume` (mêmes lots et mêmes tirages aléatoires qu'une run sans coupure) |
 | Validation | Dice moyen sur la validation du pli toutes les 4 000 itérations ; `best.pt` = meilleur Dice de validation |
 | Évaluation | test ID du pli et test OOD, fenêtre glissante gaussienne (recouvrement 0,25), probabilité mise à 0 hors du cerveau |
 | Graine | 2026 (Python, NumPy, PyTorch, échantillonneur, workers) |
@@ -51,17 +51,17 @@ Techniques : `baseline`, `intensity`, `bigaug`, `fda`, `histogram_matching`, `da
 
 Six notebooks dans `kaggle/`, générés par `kaggle/make_notebooks.py` : **pli 0, graine 2026, 40 000 itérations, fp32, clipping à 12** pour tous.
 
-| Notebook | Slug Kaggle | Technique | Compte | Durée estimée (T4, fp32) |
+| Notebook | Slug | Technique | Plateforme | Durée estimée (T4, fp32) |
 |---|---|---|---|---|
-| `00_baseline.ipynb` | `rq3-baseline-fp32-pli0` | baseline, puis TENT au test | propriétaire | 6 h 30 à 7 h 30 |
-| `01_intensite.ipynb` | `rq3-intensity-pli0` | augmentation d'intensité | Yosra | 6 h à 7 h |
-| `02_bigaug.ipynb` | `rq3-bigaug-pli0` | preset BigAug | Anas | 6 h à 7 h |
-| `03_fda.ipynb` | `rq3-fda-pli0` | FDA | propriétaire | 7 h à 9 h |
-| `04_histogram_matching.ipynb` | `rq3-histogram-matching-pli0` | histogram matching | Yosra | 6 h 30 à 7 h 30 |
-| `05_dann.ipynb` | `rq3-dann-pli0` | DANN | Anas | 6 h à 7 h |
-| `07_adaptation_continue.ipynb` | `rq3-adaptation-continue-pli0` | adaptation continue sur `best.pt` de la baseline | propriétaire | 30 à 50 min |
+| `00_baseline.ipynb` | `rq3-baseline-fp32-pli0` | baseline, puis TENT au test | Kaggle | 6 h 30 à 7 h 30 |
+| `01_intensite.ipynb` | `rq3-intensity-pli0` | augmentation d'intensité | Colab | 7 h 30 à 9 h |
+| `02_bigaug.ipynb` | `rq3-bigaug-pli0` | preset BigAug | Colab | 9 h à 10 h 30 |
+| `03_fda.ipynb` | `rq3-fda-pli0` | FDA | Kaggle | 7 h à 9 h |
+| `04_histogram_matching.ipynb` | `rq3-histogram-matching-pli0` | histogram matching (optionnelle) | Colab | 8 h à 9 h 30 |
+| `05_dann.ipynb` | `rq3-dann-pli0` | DANN | Kaggle | 6 h 30 à 7 h 30 |
+| `07_adaptation_continue.ipynb` | `rq3-adaptation-continue-pli0` | adaptation continue sur `best.pt` de la baseline | Kaggle ou Colab | 30 à 50 min |
 
-Environ 40 à 45 h de GPU pour le pli 0, sur trois comptes (2 sessions GPU en arrière-plan par compte). Répartition dans `ASSIGNMENT` ; `--handoff-dir` écrit les notebooks à importer à la main (`<prénom>/<slug>.ipynb` et `LISEZMOI.md`). Si l'itération 100 dépasse 0,75 s/it, le journal le signale (40 000 itérations ne tiendraient pas dans le budget de 10 h) sans arrêter la run. Les autres plis viendront ensuite si le budget le permet ; la référence de FDA et de l'histogram matching suit alors le pli (`fold_reference_sites`).
+Répartition dans `ASSIGNMENT` : Kaggle (2 sessions GPU en arrière-plan, quota hebdomadaire) et Google Colab (1 session, coupures possibles). `--colab-dir` écrit les notebooks Colab (`<slug>.ipynb`) : jeton Kaggle lu dans les secrets Colab (`KAGGLE_API_TOKEN`, ou `KAGGLE_USERNAME` et `KAGGLE_KEY`), datasets téléchargés par l'API Kaggle sur le disque de la machine, sorties et checkpoints sur Google Drive (`MyDrive/PROJET_AVC/<slug>/`), `last.pt` toutes les 20 min (écriture atomique), `--resume` systématique : relancer « Tout exécuter » après une coupure reprend la même trajectoire. Sur Colab (2 processeurs), le chargement des volumes limite la vitesse. Chaque notebook compare son environnement à celui de Kaggle (T4, torch 2.11.0+cu130) et le signale sans s'arrêter. Si l'itération 100 dépasse 0,75 s/it, le journal le signale (40 000 itérations ne tiendraient pas dans le budget de 10 h) sans arrêter la run. Les autres plis viendront ensuite si le budget le permet ; la référence de FDA et de l'histogram matching suit alors le pli (`fold_reference_sites`).
 
 Chaque notebook s'arrête avec un message clair sans GPU, cherche récursivement sous `/kaggle/input` le code (dataset privé `projet-avc-code`) et les données (un dataset partagé peut être monté sous un autre chemin), vérifie que `VERSION.json` porte le commit attendu (copies Kaggle), installe MONAI et TorchIO, recrée `data/processed` (hors des sorties) par des liens vers les dossiers de sujets du dataset `atlas-c1-processed` (que Kaggle ait décompressé les archives ou non), vérifie que `splits.json` est identique dans les données et dans le code, puis lance `train.py`. Réglages Kaggle : accélérateur *GPU T4*, Internet activé, les deux datasets privés en entrée, notebook privé. Une session interrompue reprend avec `--resume` après avoir copié `last.pt` de la sortie précédente.
 
@@ -101,7 +101,7 @@ cd data\kaggle_atlas_c1 ; kaggle datasets create -p . -r skip     # privé par d
 kaggle datasets status <identifiant-kaggle>/atlas-c1-processed
 ```
 
-Puis partager les deux datasets avec les comptes de Yosra et d'Anas (page du dataset, *Settings > Sharing*) s'ils doivent lancer des runs.
+Les notebooks Colab lisent les deux datasets privés avec le jeton Kaggle du propriétaire : aucun partage nécessaire.
 
 La cellule « données » des notebooks a été vérifiée en local sur un faux `/kaggle/input` construit avec le jeu C1 synthétique (archives décompressées ou non, trois parties), suivie d'un entraînement `--smoke` sur le dossier reconstitué. Elle n'a pas encore tourné sur Kaggle même.
 
@@ -152,7 +152,7 @@ tent.reset()                                                  # retour exact à 
 
 24 tests dans `adaptation/tests`, environ 25 secondes sur CPU (petits UNet MONAI 3D, volumes de 32³) :
 
-- **Boucle** (`test_train.py`, jeu C1 synthétique) : entraînement puis évaluation pour la baseline et DANN (fichiers de sortie, colonnes du CSV, journal, perte du centre), rechargement du checkpoint et évaluation TENT, reprise depuis `last.pt`, `predict()` binaire et nul hors du cerveau (volume plus petit que le patch compris), patch centré sur la lésion, technique inconnue refusée.
+- **Boucle** (`test_train.py`, jeu C1 synthétique) : entraînement puis évaluation pour la baseline et DANN (fichiers de sortie, colonnes du CSV, journal, perte du centre), rechargement du checkpoint et évaluation TENT, reprise depuis `last.pt` avec les mêmes poids qu'une run sans coupure (baseline et intensité, 0 et 2 workers, CPU), suite d'indices identique à `RandomSampler`, sauvegarde atomique, `predict()` binaire et nul hors du cerveau (volume plus petit que le patch compris), patch centré sur la lésion, technique inconnue refusée.
 
 - **DANN** : gradient inversé et multiplié par λ ; planification de Ganin (0 à p = 0, croissante, bornée) ; formes de la segmentation et des logits ; le classifieur lit bien la sortie du bottleneck ; sur l'encodeur, le gradient de la perte du centre avec inversion est l'opposé de celui sans inversion, et nul pour λ = 0, alors que celui du classifieur ne change pas ; un pas d'optimisation met à jour segmentation, encodeur et classifieur ; poids de la perte du centre.
 - **TENT** : avec BatchNorm, InstanceNorm affine et GroupNorm, seuls les paramètres de normalisation sont entraînables et seuls eux changent ; BatchNorm sur les statistiques du lot ; l'entropie baisse sur un lot synthétique ; `reset()` restaure exactement les poids, l'optimiseur et la sortie ; refus du UNet MONAI par défaut ; entropie (0 pour une prédiction certaine, ln 2 au maximum, restreinte au cerveau).

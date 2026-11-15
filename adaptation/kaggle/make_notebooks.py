@@ -1,21 +1,21 @@
-"""Génère les notebooks Kaggle du tableau d'ablation RQ3 (un par technique, mêmes pli et graine).
+"""Génère les notebooks Kaggle et Google Colab du tableau d'ablation RQ3 (un par technique, mêmes pli et graine).
 
     .venv-dl\\Scripts\\python adaptation\\kaggle\\make_notebooks.py
-    .venv-dl\\Scripts\\python adaptation\\kaggle\\make_notebooks.py --kernels-dir data\\kaggle_kernels --handoff-dir data\\kaggle_a_envoyer
+    .venv-dl\\Scripts\\python adaptation\\kaggle\\make_notebooks.py --kernels-dir data\\kaggle_kernels --colab-dir data\\colab
 
-- `adaptation/kaggle/*.ipynb` : copies de référence, sans contrôle de commit ;
-- `--kernels-dir` : un dossier par notebook du compte propriétaire, avec kernel-metadata.json (`kaggle kernels push`) ;
-- `--handoff-dir` : `<prénom>/<slug>.ipynb` pour les runs importées à la main dans l'interface Kaggle
-  par les autres membres de l'équipe (répartition : ASSIGNMENT), avec LISEZMOI.md.
-Les copies Kaggle contrôlent que VERSION.json du dataset de code porte le commit HEAD.
+- `adaptation/kaggle/*.ipynb` : copies de référence (Kaggle), sans contrôle de commit ;
+- `--kernels-dir` : un dossier par notebook Kaggle (runs de ASSIGNMENT["kaggle"] et adaptation continue), avec
+  kernel-metadata.json pour `kaggle kernels push` ;
+- `--colab-dir` : `<slug>.ipynb` pour Google Colab (runs de ASSIGNMENT["colab"] et adaptation continue) :
+  datasets téléchargés par l'API Kaggle (jeton dans les secrets Colab), sorties et checkpoints sur Google Drive
+  (MyDrive/PROJET_AVC/<slug>/), reprise automatique depuis last.pt (`--resume`, même trajectoire).
+Ces copies contrôlent que VERSION.json du dataset de code porte le commit HEAD.
 
-Le code vient du dataset Kaggle privé `projet-avc-code` (voir build_code_dataset.py), pas de GitHub ;
-les données viennent du dataset privé `atlas-c1-processed`. Les deux sont cherchés récursivement sous
-/kaggle/input (un dataset partagé peut être monté sous un autre chemin que celui du propriétaire).
+Même réglage partout : code du dataset privé `projet-avc-code` (voir build_code_dataset.py), données du dataset
+privé `atlas-c1-processed`, cherchés récursivement sous le dossier d'entrée ; fp32, pli 0, graine 2026, 4 workers.
 """
 import argparse
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -25,7 +25,8 @@ DATASET = "atlas-c1-processed"
 CODE_DATASET = "projet-avc-code"
 FOLD, SEED = 0, 2026
 SLOW_SECONDS = 0.75  # s/it à l'itération 100 au-delà desquelles 40 000 itérations + validations dépassent 10 h
-RUNS = [  # fichier, technique, titre, durée estimée sur une T4 (entraînement + validation + évaluation)
+REFERENCE = dict(torch="2.11.0+cu130", gpu="Tesla T4")  # environnement Kaggle de la baseline
+RUNS = [  # fichier, technique, titre, durée estimée sur une T4 Kaggle (entraînement + validation + évaluation)
     ("00_baseline", "baseline", "Baseline (aucune technique de généralisation), puis TENT au test", "6 h 30 à 7 h 30"),
     ("01_intensite", "intensity", "Augmentation d'intensité (gamma, contraste, bruit, flou, biais, basse résolution)", "6 h 30 à 7 h"),
     ("02_bigaug", "bigaug", "Preset BigAug", "6 h 30 à 7 h"),
@@ -33,8 +34,9 @@ RUNS = [  # fichier, technique, titre, durée estimée sur une T4 (entraînement
     ("04_histogram_matching", "histogram_matching", "Histogram matching (aussi appliqué à la validation et au test)", "7 à 7 h 30"),
     ("05_dann", "dann", "DANN (classifieur de centre et inversion de gradient)", "6 h 30 à 7 h"),
 ]
-# Répartition des runs : compte propriétaire (push en ligne de commande) et membres de l'équipe (import manuel).
-ASSIGNMENT = {USERNAME: ["baseline", "fda"], "yosra": ["intensity", "histogram_matching"], "anas": ["bigaug", "dann"]}
+COLAB_DURATIONS = {"intensity": "7 h 30 à 9 h", "bigaug": "9 à 10 h 30", "histogram_matching": "8 à 9 h 30"}
+# Répartition : Kaggle (compte du propriétaire, 2 sessions GPU) et Google Colab (1 session, reprise sur Drive).
+ASSIGNMENT = {"kaggle": ["baseline", "fda", "dann"], "colab": ["intensity", "bigaug", "histogram_matching"]}
 SLUGS = {"baseline": f"rq3-baseline-fp32-pli{FOLD}"}
 CONTINUAL = ("07_adaptation_continue", f"rq3-adaptation-continue-pli{FOLD}")
 
@@ -59,24 +61,118 @@ def fill(template, **values):
     return template
 
 
+# --- Cellules propres à Google Colab ---
+
+COLAB_KEEPALIVE = '''
+# Session active : écran maintenu allumé (Screen Wake Lock du navigateur) tant que cet onglet est visible.
+# Rien n'est cliqué automatiquement dans Colab. Laisser l'onglet ouvert, l'ordinateur branché et sans mise en veille.
+from google.colab.output import eval_js
+status = eval_js("""
+(async () => {
+  if (!("wakeLock" in navigator)) return "API Wake Lock absente de ce navigateur";
+  const lock = async () => { window.rq3WakeLock = await navigator.wakeLock.request("screen"); };
+  try { await lock(); } catch (error) { return "refusé : " + error.message; }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") lock().catch(() => {}); });
+  return "actif";
+})()
+""")
+print("Maintien de l'écran :", status)
+if status != "actif":
+    print("Régler la mise en veille de l'ordinateur sur « Jamais » (secteur) pendant la run.")
+'''
+
+COLAB_SETUP = '''
+# Google Drive (sorties et checkpoints) et jeton Kaggle lu dans les secrets Colab (jamais écrit dans le notebook).
+import os, shutil, subprocess, sys
+from pathlib import Path
+from google.colab import drive, userdata
+DRIVE = Path(os.environ.get("RQ3_DRIVE", "/content/drive"))
+drive.mount(str(DRIVE))
+SLUG = "@@SLUG@@"
+DRIVE_RUN = DRIVE / "MyDrive" / "PROJET_AVC" / SLUG
+DRIVE_RUN.mkdir(parents=True, exist_ok=True)
+
+def secret(name):
+    try:
+        return userdata.get(name)
+    except Exception:  # secret absent ou accès non accordé à ce notebook
+        return None
+
+if secret("KAGGLE_API_TOKEN"):
+    os.environ["KAGGLE_API_TOKEN"] = secret("KAGGLE_API_TOKEN")
+elif secret("KAGGLE_USERNAME") and secret("KAGGLE_KEY"):
+    os.environ["KAGGLE_USERNAME"], os.environ["KAGGLE_KEY"] = secret("KAGGLE_USERNAME"), secret("KAGGLE_KEY")
+else:
+    raise RuntimeError("Jeton Kaggle absent : panneau Secrets (icône clé) > ajouter KAGGLE_API_TOKEN, ou "
+                       "KAGGLE_USERNAME et KAGGLE_KEY, avec « Accès au notebook » activé, puis relancer.")
+for key, value in dict(RQ3_INPUT="/content/entrees", RQ3_WORKING="/content/travail", RQ3_TMP="/content/tmp").items():
+    os.environ.setdefault(key, value)  # disque local de la machine Colab
+os.environ.update(RQ3_PLATFORM="colab", RQ3_RUNS=str(DRIVE_RUN / "runs"))
+print("Sorties :", DRIVE_RUN)
+'''
+
+COLAB_DOWNLOAD = '''
+# Datasets privés téléchargés par l'API Kaggle sur le disque de la machine Colab (pas sur Drive).
+if os.environ.get("RQ3_PIP", "1") == "1":
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "kaggle==2.2.5", "six"], check=True)
+for dataset in ("@@USER@@/@@CODE_DATASET@@", "@@USER@@/@@DATASET@@"):
+    target = Path(os.environ["RQ3_INPUT"]) / dataset.split("/")[1]
+    if (target / ".complet").exists():
+        continue
+    shutil.rmtree(target, ignore_errors=True)
+    download = subprocess.run(["kaggle", "datasets", "download", dataset, "-p", str(target), "--unzip"])
+    if download.returncode:
+        raise RuntimeError(f"Téléchargement de {dataset} impossible : vérifier le jeton Kaggle (secrets Colab).")
+    (target / ".complet").touch()
+print(f"{shutil.disk_usage(os.environ['RQ3_INPUT']).free / 1e9:.0f} Go libres sur le disque local")
+'''
+
+COLAB_BASELINE = '''
+# best.pt de la baseline : sortie du notebook Kaggle @@BASELINE@@ (terminé), téléchargée par l'API Kaggle.
+target = Path(os.environ["RQ3_INPUT"]) / "baseline"
+if not any(target.rglob("best.pt")):
+    download = subprocess.run(["kaggle", "kernels", "output", "@@USER@@/@@BASELINE@@", "-p", str(target),
+                               "--file-pattern", r"unet3d_baseline_pli@@FOLD@@/(best\\.pt|resume\\.json)$"])
+    if download.returncode:
+        raise RuntimeError("Sortie de @@BASELINE@@ indisponible : la baseline doit être terminée sur Kaggle.")
+'''
+
+# --- Cellules communes (Kaggle et Colab) ---
+
 ENVIRONMENT = '''
-# Environnement : GPU obligatoire (accélérateur « GPU T4 »), sinon arrêt immédiat avec un message clair.
+# Environnement : GPU obligatoire, sinon arrêt immédiat avec un message clair ; écarts à Kaggle signalés.
 import hashlib, json, os, re, shutil, subprocess, sys, time, zipfile
 from pathlib import Path
 import torch
-print("torch", torch.__version__, "| CUDA", torch.version.cuda, "| GPU",
-      torch.cuda.get_device_name(0) if torch.cuda.is_available() else "aucun")
+PLATFORM = os.environ.get("RQ3_PLATFORM", "kaggle")
+GPU = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "aucun"
+print("Plateforme", PLATFORM, "| torch", torch.__version__, "| CUDA", torch.version.cuda, "| GPU", GPU,
+      "| Python", sys.version.split()[0])
 if not torch.cuda.is_available() and os.environ.get("RQ3_GPU", "1") == "1":
-    raise RuntimeError("AUCUN GPU DISPONIBLE : dans le panneau de droite, Settings > Accelerator > « GPU T4 x2 », "
-                       "puis relancer (Save Version > Save & Run All). Rien n'a été lancé.")
-INPUT = Path(os.environ.get("RQ3_INPUT", "/kaggle/input"))      # datasets attachés
-WORKING = Path(os.environ.get("RQ3_WORKING", "/kaggle/working"))  # toutes les sorties
+    where = ("Exécution > Modifier le type d'exécution > GPU T4" if PLATFORM == "colab"
+             else "Settings > Accelerator > « GPU T4 x2 »")
+    raise RuntimeError(f"AUCUN GPU DISPONIBLE : {where}, puis relancer. Rien n'a été lancé.")
+INPUT = Path(os.environ.get("RQ3_INPUT", "/kaggle/input"))      # datasets
+WORKING = Path(os.environ.get("RQ3_WORKING", "/kaggle/working"))  # code
+RUNS_DIR = Path(os.environ.get("RQ3_RUNS", str(WORKING / "runs")))  # toutes les sorties des runs
 SCRATCH = Path(os.environ.get("RQ3_TMP", "/tmp/rq3"))            # liens vers les données, jamais dans les sorties
 EXPECTED_COMMIT = @@COMMIT@@  # commit attendu dans VERSION.json du dataset de code (None : pas de contrôle)
+REFERENCE = @@REFERENCE@@  # environnement Kaggle de la baseline
+differences = []
+if REFERENCE["gpu"] not in GPU:
+    differences.append(f"GPU {GPU} au lieu de {REFERENCE['gpu']} : durées et arrondis différents de Kaggle")
+if torch.__version__ != REFERENCE["torch"]:
+    differences.append(f"torch {torch.__version__} au lieu de {REFERENCE['torch']} (Kaggle)")
+for difference in differences:
+    print("AVERTISSEMENT (la run continue) :", difference)
+RUNS_DIR.mkdir(parents=True, exist_ok=True)
+(RUNS_DIR / f"environnement_{PLATFORM}_{time.strftime('%Y%m%d_%H%M%S')}.json").write_text(json.dumps(dict(
+    plateforme=PLATFORM, torch=torch.__version__, cuda=torch.version.cuda, gpu=GPU, python=sys.version.split()[0],
+    reference=REFERENCE, avertissements=differences), indent=2, ensure_ascii=False))
 '''
 
 CODE_SETUP = '''
-# Code du projet : dataset privé projet-avc-code, cherché récursivement sous /kaggle/input.
+# Code du projet : dataset privé projet-avc-code, cherché récursivement dans le dossier d'entrée.
 def code_version(candidate):
     if candidate.suffix == ".zip":
         with zipfile.ZipFile(candidate) as archive:
@@ -88,34 +184,32 @@ candidates = sorted(INPUT.rglob("projet_avc_code.zip")) + sorted(
 found = [(path, code_version(path)) for path in candidates]
 found = [(path, version) for path, version in found if version]
 if not found:
-    raise FileNotFoundError("Dataset projet-avc-code introuvable sous /kaggle/input : Add Input > Datasets > "
-                            "« projet-avc-code » (onglet Shared with you), puis relancer.")
+    raise FileNotFoundError("Dataset projet-avc-code introuvable : l'ajouter en entrée, puis relancer.")
 matching = [(path, version) for path, version in found if EXPECTED_COMMIT in (None, version["commit"])]
 if not matching:
     raise RuntimeError(f"VERSION.json : commit {sorted({v['commit'] for _, v in found})} au lieu de {EXPECTED_COMMIT}. "
-                       "Mettre l'entrée projet-avc-code à sa dernière version (menu ⋮ de l'entrée), puis relancer.")
+                       "Mettre l'entrée projet-avc-code à sa dernière version, puis relancer.")
 source, VERSION = matching[0]
 print("Code :", source, VERSION)
 REPO = WORKING / "PROJET_AVC"
 if not REPO.exists():
     if source.suffix == ".zip":
         zipfile.ZipFile(source).extractall(REPO)
-    else:  # Kaggle a décompressé l'archive : copie de l'arborescence
+    else:  # archive décompressée : copie de l'arborescence
         shutil.copytree(source.parent, REPO)
 if os.environ.get("RQ3_PIP", "1") == "1":
     pip = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "monai==1.6.1", "torchio==1.2.1",
                           "nibabel==5.4.2", "pyarrow"])
     if pip.returncode:
-        raise RuntimeError("Installation de MONAI / TorchIO impossible : activer Internet "
-                           "(Settings > Internet on, compte vérifié par téléphone), puis relancer.")
+        raise RuntimeError("Installation de MONAI / TorchIO impossible : activer Internet, puis relancer.")
 '''
 
 DATA_SETUP = '''
 # Données C1 : dataset privé atlas-c1-processed, cherché récursivement ; liens vers les dossiers de sujets.
 tables = sorted(INPUT.rglob("subjects.parquet"))
 if len(tables) != 1:
-    raise FileNotFoundError(f"subjects.parquet trouvé {len(tables)} fois sous /kaggle/input (1 attendu) : "
-                            "ajouter le dataset atlas-c1-processed (Add Input > Datasets > Shared with you).")
+    raise FileNotFoundError(f"subjects.parquet trouvé {len(tables)} fois (1 attendu) : "
+                            "ajouter le dataset atlas-c1-processed en entrée.")
 TABLE = tables[0]
 DATA = SCRATCH / "processed"
 DATA.mkdir(parents=True, exist_ok=True)
@@ -144,8 +238,7 @@ assert digest(data_splits) == digest(REPO / "splits.json"), "splits.json du data
 
 TRAIN = '''
 # Entraînement, validation sur le pli, puis évaluation sur le test ID du pli et le test OOD.
-# Journal complet aussi dans /kaggle/working/runs/@@RUN@@/entrainement.log.
-# Session interrompue : rattacher la sortie précédente, copier last.pt dans /kaggle/working/runs/@@RUN@@/ et ajouter "--resume".
+# Journal complet aussi dans runs/@@RUN@@/entrainement.log.@@RESUME_NOTE@@
 def run_logged(command, log_path, slow_seconds=None, check_at=100):
     """Lance `command` depuis REPO, recopie sa sortie dans le notebook et dans `log_path`.
 
@@ -174,10 +267,10 @@ def run_logged(command, log_path, slow_seconds=None, check_at=100):
     if process.returncode:
         raise RuntimeError(f"{command[3]} terminé avec le code {process.returncode} : voir {log_path}")
 
-RUN = WORKING / "runs" / "@@RUN@@"
+RUN = RUNS_DIR / "@@RUN@@"
 run_logged([sys.executable, "-u", "-m", "adaptation.train", "--technique", "@@TECHNIQUE@@", "--fold", "@@FOLD@@",
-            "--seed", "@@SEED@@", "--data-root", str(DATA), "--output", str(WORKING / "runs"), "--num-workers", "4",
-            "--validate-every", "2000", "--log-every", "100"], RUN / "entrainement.log", slow_seconds=@@SLOW@@)
+            "--seed", "@@SEED@@", "--data-root", str(DATA), "--output", str(RUNS_DIR), "--num-workers", "4",
+            "--validate-every", "2000", "--log-every", "100"@@EXTRA@@], RUN / "entrainement.log", slow_seconds=@@SLOW@@)
 '''
 
 TENT = '''
@@ -187,66 +280,97 @@ run_logged([sys.executable, "-u", "-m", "adaptation.train", "--evaluate-only", "
 '''
 
 SUMMARY = '''
-# Résumé et fichiers à récupérer (onglet Output) ; aucune image de patient n'est écrite.
+# Résumé ; résultats légers (CSV, JSON, journaux, sans checkpoint) aussi dans resultats_@@RUN@@.zip.
 for path in sorted(RUN.glob("resume*.json")):
     print(path.name, json.dumps(json.loads(path.read_text()), indent=2, ensure_ascii=False))
+with zipfile.ZipFile(RUNS_DIR / "resultats_@@RUN@@.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(RUN.iterdir()):
+        if path.suffix in (".csv", ".json", ".log"):
+            archive.write(path, f"runs/@@RUN@@/{path.name}")
 for path in sorted(RUN.iterdir()):
     print(f"{path.stat().st_size / 1e6:10.1f} Mo  {path.name}")
+print(f"Total : {sum(p.stat().st_size for p in RUNS_DIR.rglob('*') if p.is_file()) / 1e6:.0f} Mo dans {RUNS_DIR}")
 '''
 
 
 def setup_cells(commit=None):
-    return [code(fill(ENVIRONMENT, COMMIT=repr(commit))), code(CODE_SETUP), code(DATA_SETUP)]
+    return [code(fill(ENVIRONMENT, COMMIT=repr(commit), REFERENCE=repr(REFERENCE))), code(CODE_SETUP), code(DATA_SETUP)]
 
 
-def notebook(name, technique, title, duration, commit=None):
+def colab_cells(slug):
+    return [code(COLAB_KEEPALIVE), code(fill(COLAB_SETUP, SLUG=slug)),
+            code(fill(COLAB_DOWNLOAD, USER=USERNAME, CODE_DATASET=CODE_DATASET, DATASET=DATASET))]
+
+
+def notebook_metadata(colab=False):
+    metadata = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+                "language_info": {"name": "python"}}
+    if colab:
+        metadata["accelerator"] = "GPU"
+        metadata["colab"] = {"gpuType": "T4", "provenance": []}
+    return metadata
+
+
+def notebook(name, technique, title, duration, commit=None, colab=False):
     run = f"unet3d_{technique}_pli{FOLD}"
+    slug = kernel_slug(technique)
+    if colab:
+        platform = f"""**Google Colab** (exécution > type d'exécution : *GPU T4*). Jeton Kaggle dans les secrets Colab
+(`KAGGLE_API_TOKEN`, ou `KAGGLE_USERNAME` et `KAGGLE_KEY`). Sorties et checkpoints dans `MyDrive/PROJET_AVC/{slug}/` ;
+`last.pt` toutes les 20 min. **Après une coupure, relancer « Tout exécuter »** : l'entraînement reprend au dernier
+checkpoint, avec les mêmes lots et les mêmes tirages aléatoires que sans coupure. Durée estimée (Colab, 2 processeurs) :
+{COLAB_DURATIONS.get(technique, duration)}, en une ou plusieurs sessions."""
+    else:
+        platform = f"""**Avant de lancer** : accélérateur *GPU T4*, Internet activé (installation de MONAI et TorchIO), datasets privés
+`{DATASET}` (données C1) et `{CODE_DATASET}` (code) ajoutés en entrée. Notebook à garder **privé** (accord d'utilisation
+ATLAS). *Save Version → Save & Run All*. Durée estimée sur une T4 Kaggle : {duration}. Sorties dans `/kaggle/working/runs/`."""
     cells = [
         markdown(f"""
 # RQ3 — {title}
 
-Run `{run}` (notebook Kaggle `{kernel_slug(technique)}`) du tableau d'ablation : UNet MONAI 3D en fp32 (clipping des
-gradients à 12), patches de 96³, **pli {FOLD}** de `splits.json`, **graine {SEED}**, 40 000 itérations (lots de 4 patches),
-identiques pour toutes les techniques. Durée estimée sur une T4 : {duration} (garde-fou à 10 h d'entraînement,
-session limitée à 12 h). Si l'itération 100 dépasse {SLOW_SECONDS} s/it, un avertissement est écrit dans le journal.
+Run `{run}` (`{slug}`) du tableau d'ablation : UNet MONAI 3D en fp32 (clipping des gradients à 12), patches de 96³,
+**pli {FOLD}** de `splits.json`, **graine {SEED}**, 40 000 itérations (lots de 4 patches), 4 workers, identiques pour toutes
+les techniques et sur les deux plateformes (garde-fou à 10 h d'entraînement). Si l'itération 100 dépasse {SLOW_SECONDS} s/it,
+un avertissement est écrit dans le journal, sans arrêter la run.
 
-**Avant de lancer** : accélérateur *GPU T4*, Internet activé (installation de MONAI et TorchIO), datasets privés
-`{DATASET}` (données C1) et `{CODE_DATASET}` (code) ajoutés en entrée.
-Notebook à garder **privé** (accord d'utilisation ATLAS). *Save Version → Save & Run All* pour une exécution en arrière-plan.
-Toutes les sorties sont écrites dans `/kaggle/working/runs/{run}/`.
+{platform}
 """),
+        *(colab_cells(slug) if colab else []),
         *setup_cells(commit),
-        code(fill(TRAIN, RUN=run, TECHNIQUE=technique, FOLD=FOLD, SEED=SEED, SLOW=SLOW_SECONDS)),
+        code(fill(TRAIN, RUN=run, TECHNIQUE=technique, FOLD=FOLD, SEED=SEED, SLOW=SLOW_SECONDS,
+                  EXTRA=', "--resume"' if colab else "",
+                  RESUME_NOTE=("\n# Reprise automatique : --resume repart de last.pt sur Drive s'il existe." if colab else
+                               "\n# Session interrompue : rattacher la sortie précédente, copier last.pt dans "
+                               f"/kaggle/working/runs/{run}/ et ajouter \"--resume\"."))),
     ]
     if technique == "baseline":
         cells.append(code(TENT))
-    cells.append(code(SUMMARY))
-    return {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-                                         "language_info": {"name": "python"}},
-            "nbformat": 4, "nbformat_minor": 5}
+    cells.append(code(fill(SUMMARY, RUN=run)))
+    return {"cells": cells, "metadata": notebook_metadata(colab), "nbformat": 4, "nbformat_minor": 5}
 
 
 CONTINUAL_RUN = '''
-# Checkpoint best.pt de la baseline fp32 (sortie du notebook @@BASELINE@@, attachée en entrée).
+# Checkpoint best.pt de la baseline fp32 (sortie du notebook @@BASELINE@@).
 checkpoints = [path for path in INPUT.rglob("best.pt") if path.parent.name == "unet3d_baseline_pli@@FOLD@@"]
 if not checkpoints:
     raise FileNotFoundError("best.pt de la baseline introuvable : le notebook @@BASELINE@@ doit être terminé et "
-                            "attaché en entrée (Add Input > Notebooks).")
+                            "attaché en entrée (Kaggle : Add Input > Notebooks).")
 CHECKPOINT = checkpoints[0]
 state = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
 assert all(torch.isfinite(value).all() for value in state["model"].values() if value.is_floating_point()), \\
     "best.pt contient des poids non finis"
 print("Checkpoint :", CHECKPOINT, state["state"])
-OUTPUT = WORKING / "adaptation_continue"
+OUTPUT = RUNS_DIR.parent / "adaptation_continue"
 '''
 
 CONTINUAL_MAIN = '''
 # Flux des centres OOD, évaluation préquentielle, 4 stratégies, oubli (journal aussi dans adaptation_continue/).
+# Courte (30 à 50 min) : après une coupure, elle recommence du début (sorties réécrites).
 started = time.time()
 command = [sys.executable, "-u", "-m", "adaptation.continual", "--checkpoint", str(CHECKPOINT), "--data-root", str(DATA),
            "--output", str(OUTPUT), "--subjects-per-center", "24", "--lot-size", "4"]
 OUTPUT.mkdir(parents=True, exist_ok=True)
-with open(OUTPUT / "adaptation_continue.log", "a", encoding="utf-8") as log:
+with open(OUTPUT / "adaptation_continue.log", "w", encoding="utf-8") as log:
     process = subprocess.Popen(command, cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     for line in process.stdout:
         print(line, end="", flush=True)
@@ -260,26 +384,32 @@ for path in sorted(OUTPUT.iterdir()):
 '''
 
 
-def continual_notebook(commit=None):
+def continual_notebook(commit=None, colab=False):
     baseline = kernel_slug("baseline")
+    name, slug = CONTINUAL
+    where = (f"**Google Colab** (GPU T4, jeton Kaggle dans les secrets) : datasets et `best.pt` téléchargés par l'API "
+             f"Kaggle, sorties dans `MyDrive/PROJET_AVC/{slug}/adaptation_continue/`." if colab else
+             f"**Kaggle** : *GPU T4*, Internet activé, datasets `{DATASET}` et `{CODE_DATASET}`, sortie du notebook "
+             f"`{baseline}` en entrée. Sorties dans `/kaggle/working/adaptation_continue/`.")
     cells = [
         markdown(f"""
 # RQ3 — Adaptation continue (version réduite), pli {FOLD}
 
-`adaptation/continual.py` sur le `best.pt` de la baseline fp32 (sortie du notebook `{baseline}`, attachée en entrée) :
-les 6 centres OOD présentés un par un (24 sujets par centre, lots de 4), évaluation préquentielle (chaque lot est noté
-avant de servir à l'adaptation), 4 stratégies (modèle figé, auto-apprentissage naïf, TENT seul, adaptation contrôlée =
-TENT + champion/challenger + replay buffer), Dice sur les anciens centres pour mesurer l'oubli, détection du décalage par
-distance de Wasserstein entre histogrammes d'intensité (`center_distance()`, analysis/). Durée estimée sur une T4 : 30 à 50 min.
+`adaptation/continual.py` sur le `best.pt` de la baseline fp32 (notebook `{baseline}`, terminé) : les 6 centres OOD
+présentés un par un (24 sujets par centre, lots de 4), évaluation préquentielle (chaque lot est noté avant de servir à
+l'adaptation), 4 stratégies (modèle figé, auto-apprentissage naïf, TENT seul, adaptation contrôlée = TENT +
+champion/challenger + replay buffer), Dice sur les anciens centres pour mesurer l'oubli, détection du décalage par distance
+de Wasserstein entre histogrammes d'intensité (`center_distance()`, analysis/). Durée estimée sur une T4 : 30 à 50 min.
 
-**Avant de lancer** : *GPU T4*, Internet activé, datasets `{DATASET}` et `{CODE_DATASET}`, notebook `{baseline}` terminé.
-Sorties dans `/kaggle/working/adaptation_continue/`.
+{where}
 """),
+        *(colab_cells(slug) if colab else []),
+        *([code(fill(COLAB_BASELINE, USER=USERNAME, BASELINE=baseline, FOLD=FOLD))] if colab else []),
         *setup_cells(commit),
         code(fill(CONTINUAL_RUN, BASELINE=baseline, FOLD=FOLD)),
         code(CONTINUAL_MAIN),
     ]
-    return {**notebook(*RUNS[0]), "cells": cells}
+    return {"cells": cells, "metadata": notebook_metadata(colab), "nbformat": 4, "nbformat_minor": 5}
 
 
 DIAG = ("06_diag_nan", "rq3-diag-nan")
@@ -307,7 +437,7 @@ print((Path("/kaggle/working/diag_nan") / "resume.json").read_text())
 !find /kaggle/working/diag_nan -type f -exec ls -la {} +
 """),
     ]
-    return {**notebook(*RUNS[0]), "cells": cells}
+    return {"cells": cells, "metadata": notebook_metadata(), "nbformat": 4, "nbformat_minor": 5}
 
 
 def kernel_metadata(name, slug, kernel_sources=()):
@@ -316,24 +446,6 @@ def kernel_metadata(name, slug, kernel_sources=()):
             "kernel_type": "notebook", "is_private": True, "enable_gpu": True, "enable_tpu": False,
             "enable_internet": True, "dataset_sources": [f"{USERNAME}/{DATASET}", f"{USERNAME}/{CODE_DATASET}"],
             "competition_sources": [], "kernel_sources": [f"{USERNAME}/{slug}" for slug in kernel_sources]}
-
-
-HANDOFF_README = """# Runs RQ3 à lancer depuis ton compte Kaggle (@@NAME@@)
-
-Notebooks : @@FILES@@. Chacun est autonome ; compter 6 h 30 à 9 h par run, toutes les sorties vont dans /kaggle/working/.
-Tu peux lancer les deux en même temps (2 sessions GPU en arrière-plan par compte).
-
-Pour chaque notebook :
-1. kaggle.com > Code > New Notebook, puis File > Import Notebook > choisir le fichier .ipynb.
-2. Titre du notebook = nom du fichier sans .ipynb (ex. rq3-fda-pli0). Garder le notebook **privé**.
-3. Panneau de droite > Input > Add Input > Datasets > onglet « Shared with you » : ajouter
-   `atlas-c1-processed` puis `projet-avc-code` (fayfahachicha).
-4. Settings : Accelerator = **GPU T4 x2** ; Internet = **On** (il faut un compte vérifié par téléphone).
-5. Save Version > **Save & Run All (Commit)** > Save. La run tourne en arrière-plan ; on peut fermer l'onglet.
-6. Dans les 5 premières minutes, ouvrir la version en cours (Logs) : on doit voir le GPU (Tesla T4), le commit du code
-   et « sujets prétraités ». En cas d'erreur, le message dit quoi corriger (GPU, Internet, dataset, version du code).
-7. À la fin (onglet Output de la version), tout télécharger (Download) et envoyer le .zip tel quel.
-"""
 
 
 def write_notebook(path, content):
@@ -350,21 +462,21 @@ def write_kernel(folder, name, content, metadata):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--kernels-dir", type=Path, help="dossiers kaggle kernels push (runs du compte propriétaire)")
-    parser.add_argument("--handoff-dir", type=Path, help="notebooks à importer à la main, un dossier par membre")
+    parser.add_argument("--kernels-dir", type=Path, help="dossiers kaggle kernels push (runs Kaggle)")
+    parser.add_argument("--colab-dir", type=Path, help="notebooks Google Colab (<slug>.ipynb)")
     args = parser.parse_args()
     for name, technique, title, duration in RUNS:
         write_notebook(HERE / f"{name}.ipynb", notebook(name, technique, title, duration))
     write_notebook(HERE / f"{CONTINUAL[0]}.ipynb", continual_notebook())
     write_notebook(HERE / f"{DIAG[0]}.ipynb", diag_notebook())
     print("Notebooks de référence :", HERE)
-    if not (args.kernels_dir or args.handoff_dir):
+    if not (args.kernels_dir or args.colab_dir):
         return
-    commit = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short", "HEAD"], check=True,
-                            capture_output=True, text=True).stdout.strip()
+    commit = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short", "HEAD"],
+                            check=True, capture_output=True, text=True).stdout.strip()
     by_technique = {technique: (name, title, duration) for name, technique, title, duration in RUNS}
     if args.kernels_dir:
-        for technique in ASSIGNMENT[USERNAME]:
+        for technique in ASSIGNMENT["kaggle"]:
             if technique == "baseline":
                 continue  # déjà poussée (rq3-baseline-fp32-pli0, version 1) ; dossier 00_baseline inchangé
             name, title, duration = by_technique[technique]
@@ -375,19 +487,15 @@ def main():
         write_kernel(args.kernels_dir / name, name, continual_notebook(commit),
                      kernel_metadata(name, slug, kernel_sources=[kernel_slug("baseline")]))
         print(args.kernels_dir / name, slug)
-    if args.handoff_dir:
-        for member, techniques in ASSIGNMENT.items():
-            if member == USERNAME:
-                continue
-            files = []
-            for technique in techniques:
-                name, title, duration = by_technique[technique]
-                path = args.handoff_dir / member / f"{kernel_slug(technique)}.ipynb"
-                write_notebook(path, notebook(name, technique, title, duration, commit))
-                files.append(path.name)
-                print(path)
-            (args.handoff_dir / member / "LISEZMOI.md").write_text(
-                fill(HANDOFF_README, NAME=member.capitalize(), FILES=", ".join(files)), encoding="utf-8")
+    if args.colab_dir:
+        for technique in ASSIGNMENT["colab"]:
+            name, title, duration = by_technique[technique]
+            path = args.colab_dir / f"{kernel_slug(technique)}.ipynb"
+            write_notebook(path, notebook(name, technique, title, duration, commit, colab=True))
+            print(path)
+        path = args.colab_dir / f"{CONTINUAL[1]}.ipynb"
+        write_notebook(path, continual_notebook(commit, colab=True))
+        print(path)
     print("Commit attendu dans VERSION.json :", commit)
 
 

@@ -16,10 +16,15 @@ Sorties dans `--output` (jamais dans Git) : `last.pt`, `best.pt`, `journal_entra
 `resultats_<split>.csv` (une ligne par sujet, métriques de baselines/common.py) et `resume.json`.
 """
 import argparse
+import collections
 import copy
 import csv
+import functools
+import itertools
 import json
 import math
+import os
+import pickle
 import random
 import sys
 import time
@@ -124,6 +129,63 @@ def worker_seed(worker_id):
     seed = torch.initial_seed() % 2**32
     random.seed(seed + worker_id)
     np.random.seed((seed + worker_id) % 2**32)
+
+
+# --- Reprise exacte après une coupure (session Kaggle ou Colab) ---
+# Sans reprise, ces outils ne changent rien : mêmes indices tirés, aucun tirage aléatoire supplémentaire.
+
+def rng_state():
+    """État sérialisé des générateurs du processus courant (torch, numpy, random) ; ne tire rien."""
+    return pickle.dumps((torch.get_rng_state(), np.random.get_state(), random.getstate()))
+
+
+def set_rng_state(blob):
+    torch_state, numpy_state, python_state = pickle.loads(blob)
+    torch.set_rng_state(torch_state)
+    np.random.set_state(numpy_state)
+    random.setstate(python_state)
+
+
+def resume_worker(worker_id, states=()):
+    """Initialisation d'un worker à la reprise : état du worker qui aurait produit le même lot sans coupure."""
+    worker_seed(worker_id)
+    if worker_id < len(states):
+        set_rng_state(states[worker_id])
+
+
+class TrackedDataset(torch.utils.data.Dataset):
+    """Chaque élément avec l'état aléatoire du processus qui vient de le produire (pour last.pt)."""
+
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        return self.dataset[index], rng_state()
+
+
+def collate_tracked(items):
+    batch = collate_patches([item for item, _ in items])
+    batch["rng"] = items[-1][1]  # état du worker après le dernier volume du lot
+    return batch
+
+
+class ResumableSampler(torch.utils.data.Sampler):
+    """Même suite d'indices que RandomSampler(replacement=True, generator=Generator().manual_seed(seed)),
+    à partir du rang `start` (volumes déjà consommés avant la coupure)."""
+
+    def __init__(self, dataset, num_samples, seed, start=0):
+        self.dataset, self.num_samples, self.seed, self.start = dataset, num_samples, seed, start
+
+    def __iter__(self):
+        base = torch.utils.data.RandomSampler(self.dataset, replacement=True, num_samples=self.num_samples,
+                                              generator=torch.Generator().manual_seed(self.seed))
+        return itertools.islice(iter(base), self.start, None)
+
+    def __len__(self):
+        return self.num_samples - self.start
 
 
 # --- Données ---
@@ -410,9 +472,14 @@ class DivergenceGuard:
                                    f"GradScaler (gradients non finis) ; arrêt de l'entraînement")
 
 
-def save_checkpoint(path, model, optimizer, scaler, state, cfg):
+def save_checkpoint(path, model, optimizer, scaler, state, cfg, resume=None):
+    """Écriture atomique (fichier temporaire puis renommage) : une coupure pendant l'écriture laisse
+    l'ancien checkpoint intact. `resume` : états aléatoires des derniers lots, workers, LR (last.pt)."""
+    path = Path(path)
+    temporary = path.with_name(path.name + ".tmp")
     torch.save(dict(model=model.state_dict(), optimizer=optimizer.state_dict(), scaler=scaler.state_dict(),
-                    state=state, config=asdict(cfg)), path)
+                    state=state, config=asdict(cfg), reprise=resume), temporary)
+    os.replace(temporary, path)
 
 
 def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=None, resume=False):
@@ -434,13 +501,6 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
     (output / "config.json").write_text(json.dumps(asdict(cfg), indent=2, default=str), encoding="utf-8")
 
     train_records, validation_records = training_records(cfg)
-    dataset = PatchDataset(train_records, augment, cfg, centers)
-    sampler = torch.utils.data.RandomSampler(dataset, replacement=True, num_samples=10**7,
-                                             generator=torch.Generator().manual_seed(cfg.seed))
-    loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.volumes_per_batch, sampler=sampler,
-                                         num_workers=cfg.num_workers, collate_fn=collate_patches,
-                                         worker_init_fn=worker_seed, persistent_workers=cfg.num_workers > 0,
-                                         pin_memory=device.type == "cuda")
     network = build_network(cfg)
     model = (wrap_model(network) if wrap_model else network).to(device)
     from monai.losses import DiceCELoss
@@ -449,13 +509,30 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
     scaler = torch.amp.GradScaler(device.type, enabled=cfg.amp and device.type == "cuda")
     state = dict(iteration=0, elapsed=0.0, best_dice=-math.inf, best_iteration=None)
     guard = DivergenceGuard()
+    workers, rng_states = cfg.num_workers, []
     if resume and (output / "last.pt").is_file():
         checkpoint = torch.load(output / "last.pt", map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         scaler.load_state_dict(checkpoint["scaler"])
         state = checkpoint["state"]
-        print(f"Reprise à l'itération {state['iteration']} ({state['elapsed'] / 3600:.2f} h)")
+        saved = checkpoint.get("reprise") or {}
+        rng_states = list(saved.get("rng_lots", []))
+        if rng_states and saved.get("num_workers") != workers:
+            print(f"Reprise avec {workers} workers au lieu de {saved.get('num_workers')} : tirages aléatoires "
+                  "différents de la run sans coupure")
+            rng_states = []
+        print(f"Reprise à l'itération {state['iteration']} ({state['elapsed'] / 3600:.2f} h) ; "
+              + ("indices et états aléatoires restaurés" if rng_states else "indices restaurés, états aléatoires neufs"))
+    # Données : construites après la reprise (rang de départ des indices) ; aucun tirage aléatoire ici.
+    dataset = TrackedDataset(PatchDataset(train_records, augment, cfg, centers))
+    sampler = ResumableSampler(dataset, 10**7, cfg.seed, start=state["iteration"] * cfg.volumes_per_batch)
+    worker_init = functools.partial(resume_worker, states=tuple(rng_states)) if workers and rng_states else worker_seed
+    loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.volumes_per_batch, sampler=sampler,
+                                         num_workers=workers, collate_fn=collate_tracked,
+                                         worker_init_fn=worker_init, persistent_workers=workers > 0,
+                                         pin_memory=device.type == "cuda")
+    recent = collections.deque(rng_states, maxlen=max(workers, 1))  # états après les derniers lots appris
     log = CsvWriter(output / "journal_entrainement.csv", ["iteration", "heures", "lr", "lambda", "perte",
                                                          "perte_segmentation", "perte_centre", "dice_validation"],
                     append=state["iteration"] > 0)
@@ -466,13 +543,24 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
     model.train()
     running = []
     window_start, window_iteration = time.time(), state["iteration"]
-    for batch in loader:
+    lr = None
+
+    def resume_info():
+        return dict(rng_lots=list(recent), num_workers=workers, lr=lr,
+                    volumes_consommes=state["iteration"] * cfg.volumes_per_batch)
+
+    batches = iter(loader)
+    if not workers and rng_states:  # chargement dans ce processus : son état après le dernier lot appris
+        set_rng_state(rng_states[-1])
+    for batch in batches:
+        batch_rng = batch.pop("rng")
         # Avancement de 0 à 1 : budget de temps, ou nombre d'itérations s'il est atteint avant.
         progress = (time.time() - started) / budget
         if cfg.max_iterations:
             progress = max(progress, state["iteration"] / cfg.max_iterations)
         if progress >= 1.0:
             break
+        recent.append(batch_rng)
         lr = cfg.learning_rate * (1 - progress) ** 0.9  # décroissance polynomiale sur le budget
         for group in optimizer.param_groups:
             group["lr"] = lr
@@ -524,10 +612,10 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
             running = []
         if time.time() - last_checkpoint > cfg.checkpoint_minutes * 60:
             state["elapsed"] = time.time() - started
-            save_checkpoint(output / "last.pt", model, optimizer, scaler, state, cfg)
+            save_checkpoint(output / "last.pt", model, optimizer, scaler, state, cfg, resume_info())
             last_checkpoint = time.time()
     state["elapsed"] = time.time() - started
-    save_checkpoint(output / "last.pt", model, optimizer, scaler, state, cfg)
+    save_checkpoint(output / "last.pt", model, optimizer, scaler, state, cfg, resume_info())
     if not len(validation_records) and not (output / "best.pt").is_file():
         save_checkpoint(output / "best.pt", model, optimizer, scaler, state, cfg)  # entraînement final : le dernier
     print(f"Entraînement terminé : {state['iteration']} itérations, {state['elapsed'] / 3600:.2f} h, "
