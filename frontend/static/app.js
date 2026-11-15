@@ -52,6 +52,12 @@
       <span class="value" ${num ? `data-count="${value}" data-digits="${digits}"` : String(value).length > 9 ? 'style="font-size:1.4rem"' : ''}>${num ? '0' : value}</span>
       <span class="hint">${hint || ''}</span></div>`;
   };
+  const OWNERS = {
+    yosra: ['Ma partie · Yosra', 'violet'], anas: ['Équipe · Anas', 'id'], fayfa: ['Équipe · Fayfa', 'ood'],
+    equipe: ['Équipe', ''], mixte: ['Équipe + ma partie', 'warn'], projet: ['Projet complet', ''],
+  };
+  const ownerChip = (who) => { const [label, kind] = OWNERS[who] || [who, '']; return `<span class="badge owner-chip ${kind}">${label}</span>`; };
+  const own = (who, title) => `${title}${ownerChip(who)}`;
   const card = (title, body, sub = '', color) =>
     `<section class="card" ${color ? `style="--dot:linear-gradient(135deg,${color[0]},${color[1]})"` : ''}><header><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</header>${body}</section>`;
   const notes = (sections, sub = '') => `<details class="card notes"><summary><div>Notes méthodologiques et limites<span>${sub}</span></div></summary>
@@ -156,6 +162,32 @@
         { name: 'Test OOD', value: s.ood_test, color: OOD[0], color2: OOD[1] },
       ], center: fmt(s.cases, 0), sub: 'cas',
     });
+  }
+
+  /* ---------- Ma contribution ---------- */
+  const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+  async function contribution() {
+    const d = await api('/api/contribution');
+    const links = { 'S1–S2': 'qc', S3: 'pretraitement', S4: 'pretraitement', S5: 'shift', S6: 'shift', S7: 'modeles', S8: 'modeles', 'S9–S10': 'demo', S11: 'demo', S12: 'conclusions', 'S13–S14': 'conclusions' };
+    content.innerHTML = `
+      <section class="card hero"><div class="hero-grid"><div>
+        <h2>Mon rôle : des IRM brutes à l’analyse du domain shift</h2>
+        <p>J’ai pris en charge l’exploration des données, le pipeline de prétraitement distribué, le contrôle qualité et le split,
+        l’analyse du décalage entre centres, l’analyse délai / Dice, la démo IRM et l’intégration du travail de l’équipe.</p>
+        <div class="chips"><span>Exploration & QC</span><span>Pipeline Spark</span><span>Split v2</span><span>Domain shift</span><span>Démo & Docker</span><span>Intégration</span></div>
+      </div>${heroArt}</div></section>
+      <div class="grid g4">
+        ${kpi('Volumes validés et exportés', d.counts.retained, `sur ${fmt(d.counts.inventoried, 0)} inventoriés`, 'brain', P.violet)}
+        ${kpi('Centres analysés', d.centers, 'statistiques et distances', 'hospital', P.cyan)}
+        ${kpi('Sujets pour l’empreinte S6', d.fingerprint_scans, 'reconnaissance du centre', 'target', P.orange)}
+        ${kpi('Mes tests automatisés', d.tests, 'pipeline et analyses ✓', 'check', P.green)}
+      </div>
+      ${card('Mon parcours semaine par semaine', `<ol class="weeks">${d.weeks.map((w) => `
+        <li><a class="wk" href="#${links[w.weeks] || 'accueil'}">${esc(w.weeks)}</a><p>${md(w.text)}</p></li>`).join('')}</ol>`,
+        'repris de docs/yosra/SUIVI_SEMAINES.md', P.violet)}
+      ${card('Ce qui vient de l’équipe', `<ul class="todo">${d.team.map((t) =>
+        `<li><span>${ownerChip(t.who === 'Anas' ? 'anas' : t.who === 'Fayfa' ? 'fayfa' : 'equipe')}</span><span>${esc(t.what)}</span><a class="more" href="#${t.page}">voir →</a></li>`).join('')}</ul>`,
+        'intégré et présenté, mais pas réalisé par moi', P.blue)}`;
   }
 
   /* ---------- Données & QC ---------- */
@@ -302,10 +334,10 @@
     content.innerHTML = `
       <p class="callout warn" style="margin:0">Résultats réels des baselines d’Anas, sur le <b>protocole historique</b> (903 train / 226 ID / 287 OOD).
         Ils ne remplacent pas les cinq plis du split v2, en attente des checkpoints.</p>
-      ${card('Dice par modèle : centres connus (ID) vs inconnus (OOD)', '<div id="dice"></div>', `${m[0]?.n_ID ?? '—'} cas ID · ${m[0]?.n_OOD ?? '—'} cas OOD`, P.pink)}
+      ${card(own('anas', 'Dice par modèle : centres connus (ID) vs inconnus (OOD)'), '<div id="dice"></div>', `${m[0]?.n_ID ?? '—'} cas ID · ${m[0]?.n_OOD ?? '—'} cas OOD`, P.pink)}
       <div class="grid g2">
-        ${card('Écart de Dice ID − OOD (IC 95 %)', '<div id="gap"></div>', 'Négatif = meilleur sur OOD', P.violet)}
-        ${card('Le délai depuis l’AVC explique-t-il le Dice ?', `<div id="r2"></div>
+        ${card(own('anas', 'Écart de Dice ID − OOD (IC 95 %)'), '<div id="gap"></div>', 'Négatif = meilleur sur OOD', P.violet)}
+        ${card(own('yosra', 'Le délai depuis l’AVC explique-t-il le Dice ?'), `<div id="r2"></div>
           <div class="metric-row" style="margin-top:18px">
             <div class="metric tint" style="${g(ID)}"><b>${fmt(t.ID.incremental_r2_time, 4)}</b><span>ID · R² ajouté par le temps (p = ${fmt(t.ID.permutation_p_time_given_center, 3)})</span></div>
             <div class="metric tint" style="${g(OOD)}"><b>${fmt(t.OOD.incremental_r2_time, 3)}</b><span>OOD · R² ajouté par le temps (p = ${fmt(t.OOD.permutation_p_time_given_center, 3)})</span></div>
@@ -313,7 +345,7 @@
           <p class="callout">En ID, c’est le centre qui explique la variation du Dice (R² ajouté ${fmt(t.ID.incremental_r2_center, 3)}) ; le délai n’ajoute rien.
           En OOD, un faible effet du délai apparaît, mais il disparaît une fois le volume lésionnel contrôlé (${fmt(t.OOD.volume_sensitivity.incremental_r2_time_given_center_and_volume, 4)}).</p>`, 'R² par groupe', P.amber)}
       </div>
-      ${card('Toutes les métriques', '<div id="metrics"></div>', '', P.blue)}
+      ${card(own('anas', 'Toutes les métriques'), '<div id="metrics"></div>', '', P.blue)}
       ${notes([['Limites de l’analyse temporelle', list(d.temporal.limitations || [])]], 'cliquer pour afficher')}`;
     bars($('#dice'), {
       labels: m.map(short),
@@ -355,19 +387,19 @@
         ${kpi('Total', v.total_passed, v.status === 'passed' ? 'tous réussis ✓' : v.status, 'zap', P.green)}
       </div>
       <div class="grid g2">
-        ${card('DANN — adaptation adversariale', `
+        ${card(own('fayfa', 'DANN — adaptation adversariale'), `
           <p>Un classifieur de centre est branché sur l’encodeur via une <b>couche d’inversion de gradient</b> :
           le réseau apprend des représentations utiles à la segmentation mais peu informatives sur le centre.</p>
           <p class="callout">Module <code>adaptation.dann.DANNWrapper</code> — utilise les centres du train de chaque pli.</p>`, '', P.pink)}
-        ${card('TENT — adaptation au moment du test', `
+        ${card(own('fayfa', 'TENT — adaptation au moment du test'), `
           <p>Sur un nouveau centre, seuls les paramètres de normalisation sont ajustés en minimisant l’entropie des prédictions,
           <b>sans étiquette</b>. Le modèle est réinitialisé entre centres.</p>
           <p class="callout">Module <code>adaptation.tent.Tent</code> — restreint au masque cérébral.</p>`, '', P.amber)}
       </div>
       <div class="grid g2">
-        ${card('Centres tenus à l’écart (OOD)', `<div class="checks">${d.held_out_sites.map((s) => badge(s, 'ood')).join('')}</div>
+        ${card(own('fayfa', 'Centres tenus à l’écart (OOD)'), `<div class="checks">${d.held_out_sites.map((s) => badge(s, 'ood')).join('')}</div>
           <p class="muted">${d.training_sites} centres d’entraînement · split v${d.splits?.version} · empreinte ${esc(d.splits?.sha256_16 || '')}</p>`, '', P.orange)}
-        ${card('État de l’intégration', `
+        ${card(own('yosra', 'État de l’intégration'), `
           <dl class="kv">
             <dt>Branches fusionnées</dt><dd>${Object.keys(v.branches).map((b) => badge(b, 'violet')).join(' ')}</dd>
             <dt>Calibration</dt><dd>recalculée sur le split v${v.calibration.split_version}</dd>
@@ -376,7 +408,7 @@
           </dl>`, '', P.violet)}
       </div>
       ${resultsCard(d)}
-      ${card('Expériences restantes (C1 v2)', `
+      ${card(own('yosra', 'Expériences restantes (C1 v2)'), `
         <div class="checks">${exp.map(([k, e]) => badge(`${k.replace('baseline_fold_', 'Pli ')} : ${e.status === 'missing' ? 'en attente' : e.status}`, e.status === 'missing' ? 'warn' : 'ok')).join('')}</div>
         <p class="callout warn">${esc(d.readiness?.scope || '')}. Aucun Dice DANN/TENT n’est affiché tant que les poids entraînés ne sont pas fournis.</p>`, '', P.amber)}`;
   }
@@ -384,7 +416,7 @@
   function resultsCard(d) {
     const r = d.results;
     if (!r) {
-      return card('Comparaison baseline · DANN · TENT', `
+      return card(own('equipe', 'Comparaison baseline · DANN · TENT'), `
         <div class="empty">${icon('chart')}<span><b>En attente des résultats entraînés.</b><br>
         Dès que le fichier <code>${esc(d.expected.path)}</code> est livré, cette section affiche automatiquement
         le Dice ID / OOD de chaque technique.</span></div>
@@ -392,7 +424,7 @@
         Le rôle ID / OOD est pris dans le split v2 actif ; les cas de validation sont ignorés.</p>`, 'aucun chiffre simulé', P.violet);
     }
     if (r.status !== 'ready') {
-      return card('Comparaison baseline · DANN · TENT', `<p class="status err">${esc(r.reason || r.status)}</p>`, esc(r.path), P.red);
+      return card(own('equipe', 'Comparaison baseline · DANN · TENT'), `<p class="status err">${esc(r.reason || r.status)}</p>`, esc(r.path), P.red);
     }
     setTimeout(() => {
       const val = (t, role) => (r.summary.find((x) => x.technique === t && x.role === role) || {}).mean_dice ?? null;
@@ -410,7 +442,7 @@
         { key: 'mean_dice', label: 'Dice moyen', render: (v) => fmt(v, 3) },
       ], { search: false });
     });
-    return card('Comparaison baseline · DANN · TENT', `<div id="tech-chart"></div><div id="tech-table" style="margin-top:18px"></div>
+    return card(own('equipe', 'Comparaison baseline · DANN · TENT'), `<div id="tech-chart"></div><div id="tech-table" style="margin-top:18px"></div>
       <p class="callout">Source : <code>${esc(r.path)}</code> · empreinte ${esc(r.sha256_16)} · ${fmt(r.ignored, 0)} lignes de validation ou invalides ignorées.</p>`,
       `${r.techniques.length} technique(s)`, P.violet);
   }
@@ -636,15 +668,16 @@
 
   /* ---------- Routage ---------- */
   const pages = {
-    accueil: ['Projet AVC', 'Vue d’ensemble', accueil, 'Le projet en un coup d’œil : données, résultats clés et parcours.'],
-    qc: ['S1–S2 · Exploration', 'Données & contrôle qualité', qc, 'Ce que contient la cohorte et ce qui a été écarté, centre par centre.'],
-    pretraitement: ['S3–S4 · Pipeline', 'Prétraitement distribué', pretraitement, 'De l’IRM brute au volume normalisé, avec Spark.'],
-    shift: ['S5–S6 · Analyse', 'Domain shift entre centres', shift, 'À quel point les centres diffèrent, avant et après normalisation.'],
-    modeles: ['S7–S10 · Évaluation', 'Modèles & Dice', modeles, 'Performances des baselines sur les centres connus et inconnus.'],
-    adaptation: ['S11–S12 · Généralisation', 'Adaptation de domaine', adaptation, 'DANN et TENT : prêts, testés, en attente des poids entraînés.'],
-    demo: ['S12–S14 · Démo', 'Démo IRM', demo, 'Chargez une IRM et son masque pour obtenir coupes, volume et vue 3D.'],
-    conclusions: ['Synthèse', 'Conclusions', conclusions, 'Les messages clés du projet et ce qui reste à faire.'],
-    galerie: ['Figures', 'Galerie des figures', galerie, 'Toutes les figures du projet, cliquez pour agrandir.'],
+    accueil: ['Projet AVC', 'Vue d’ensemble', accueil, 'Le projet en un coup d’œil : données, résultats clés et parcours.', 'projet'],
+    contribution: ['Yosra', 'Ma contribution', contribution, 'Ce que j’ai réalisé dans le projet, semaine par semaine.', 'yosra'],
+    qc: ['S1–S2 · Exploration', 'Données & contrôle qualité', qc, 'Ce que contient la cohorte et ce qui a été écarté, centre par centre.', 'yosra'],
+    pretraitement: ['S3–S4 · Pipeline', 'Prétraitement distribué', pretraitement, 'De l’IRM brute au volume normalisé, avec Spark.', 'yosra'],
+    shift: ['S5–S6 · Analyse', 'Domain shift entre centres', shift, 'À quel point les centres diffèrent, avant et après normalisation.', 'yosra'],
+    modeles: ['S7–S10 · Évaluation', 'Modèles & Dice', modeles, 'Performances des baselines sur les centres connus et inconnus.', 'mixte'],
+    adaptation: ['S11–S12 · Généralisation', 'Adaptation de domaine', adaptation, 'DANN et TENT : prêts, testés, en attente des poids entraînés.', 'mixte'],
+    demo: ['S12–S14 · Démo', 'Démo IRM', demo, 'Chargez une IRM et son masque pour obtenir coupes, volume et vue 3D.', 'yosra'],
+    conclusions: ['Synthèse', 'Conclusions', conclusions, 'Les messages clés du projet et ce qui reste à faire.', 'projet'],
+    galerie: ['Figures', 'Galerie des figures', galerie, 'Toutes les figures du projet, cliquez pour agrandir.', 'projet'],
   };
 
   const sidebar = $('#sidebar'), scrim = $('#scrim');
@@ -652,7 +685,8 @@
 
   async function route() {
     const key = pages[location.hash.slice(1)] ? location.hash.slice(1) : 'accueil';
-    const [eyebrow, title, render, subtitle] = pages[key];
+    const [eyebrow, title, render, subtitle, owner] = pages[key];
+    $('#page-owner').innerHTML = owner ? ownerChip(owner) : '';
     $('#page-eyebrow').textContent = eyebrow; $('#page-title').textContent = title; $('#page-sub').textContent = subtitle;
     document.title = `${title} · Projet AVC`;
     document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === key));

@@ -270,6 +270,37 @@ def conclusions():
     ))
 
 
+def weekly_plan(relative='docs/yosra/SUIVI_SEMAINES.md'):
+    """Lignes « | Semaines | Livrables | » du suivi de Yosra, texte inchangé."""
+    path = ROOT / relative
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text().splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        if len(cells) == 2 and cells[0].startswith('S') and cells[0][1:2].isdigit():
+            rows.append(dict(weeks=cells[0], text=cells[1]))
+    return rows
+
+
+@app.get('/api/contribution')
+def contribution():
+    verification = read_json('integration/reports/verification.json') or {}
+    qc = read_json('analysis/reports/qc_by_center/summary.json') or {}
+    fp = read_json('analysis/reports/s6_uncertainty/summary.json') or {}
+    return respond(dict(
+        weeks=weekly_plan(),
+        tests=(verification.get('yosra_tests') or {}).get('passed'),
+        counts=qc.get('counts', {}), centers=qc.get('centers_retained'),
+        fingerprint_scans=fp.get('scans'),
+        team=[
+            dict(who='Anas', what='Baselines CNN 2.5D et ML (protocole historique)', page='modeles'),
+            dict(who='Fayfa', what='Généralisation, augmentations, modules DANN et TENT', page='adaptation'),
+            dict(who='Équipe', what='Checkpoints entraînés et résultats C1 v2 (fichier C3)', page='adaptation'),
+        ],
+    ))
+
+
 @app.get('/api/figures')
 def figures():
     return [dict(path=p, group=g, caption=c) for p, g, c in FIGURES if (ROOT / p).exists()]

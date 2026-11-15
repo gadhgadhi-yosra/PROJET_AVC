@@ -320,3 +320,21 @@ ul.todo .check { width: 22px; height: 22px; border-radius: 7px; border: 2px soli
 ul.todo li.done .check { background: #10b981; border-color: #10b981; }
 :root[data-theme="dark"] .drawer-head h2, :root[data-theme="dark"] .drawer-body section h3, :root[data-theme="dark"] .message h3 { color: #c4b5fd; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .drawer-head h2, :root:not([data-theme="light"]) .drawer-body section h3, :root:not([data-theme="light"]) .message h3 { color: #c4b5fd; } }
+
+/* Propriétaire : ma partie / équipe */
+.title-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.title-meta .eyebrow { margin-bottom: 0; }
+.owner .badge { font-size: .7rem; }
+.card > header h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.owner-chip { font-size: .68rem; font-weight: 600; letter-spacing: 0; }
+
+/* Ma contribution : frise des semaines */
+ol.weeks { list-style: none; margin: 0; padding: 0 0 0 4px; position: relative; }
+ol.weeks::before { content: ""; position: absolute; left: 42px; top: 8px; bottom: 8px; width: 2px; background: linear-gradient(#c4b5fd, #f9a8d4, #fdba74); border-radius: 2px; }
+ol.weeks li { display: grid; grid-template-columns: 78px 1fr; gap: 18px; align-items: start; padding: 10px 0; position: relative; }
+ol.weeks .wk { position: relative; z-index: 1; justify-self: center; min-width: 64px; text-align: center; padding: 4px 8px; border-radius: 10px; background: var(--panel); border: 2px solid #c4b5fd;
+  color: #7c5ce6; font-weight: 700; font-size: .76rem; text-decoration: none; transition: background .2s, color .2s; }
+ol.weeks .wk:hover { background: #7c5ce6; color: #fff; border-color: #7c5ce6; }
+ol.weeks p { margin: 2px 0 0; font-size: .9rem; color: var(--ink); line-height: 1.6; }
+ol.weeks p b { color: #7c5ce6; }
+@media (max-width: 640px) { ol.weeks li { grid-template-columns: 64px 1fr; gap: 12px; } ol.weeks::before { left: 34px; } }

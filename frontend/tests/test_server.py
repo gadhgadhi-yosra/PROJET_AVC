@@ -56,6 +56,12 @@ class FrontendTest(unittest.TestCase):
         dann_ood = next(x for x in result['summary'] if x['technique'] == 'dann' and x['role'] == 'OOD')
         self.assertAlmostEqual(dann_ood['mean_dice'], 0.5)
 
+    def test_contribution_reads_weekly_plan(self):
+        data = client.get('/api/contribution').json()
+        self.assertEqual(data['weeks'][0]['weeks'], 'S1–S2')
+        self.assertEqual(data['weeks'][-1]['weeks'], 'S13–S14')
+        self.assertEqual(data['tests'], 34)
+
     def test_pages_and_files(self):
         self.assertIn('Projet AVC', client.get('/').text)
         figure = client.get('/api/figures').json()[0]['path']
