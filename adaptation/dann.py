@@ -41,23 +41,31 @@ class GradientReversal(nn.Module):
         return f"lambda_={self.lambda_:g}"
 
 
-def ganin_lambda(progress, gamma=10.0):
+def ganin_lambda(progress, gamma=10.0, start=0.0):
     """Planification de Ganin : lambda = 2 / (1 + exp(-gamma × p)) - 1, de 0 (p = 0) vers 1 (p = 1).
 
-    La montée progressive évite que le classifieur, encore aléatoire, perturbe l'encodeur au début
-    (solution de repli prévue si DANN est instable).
+    start : part de l'entraînement où lambda reste nul (le classifieur apprend d'abord sur des
+    caractéristiques stables) ; la montée de Ganin se fait ensuite sur le reste. Un gamma plus petit
+    rend la montée plus progressive.
     """
     progress = min(max(float(progress), 0.0), 1.0)
+    progress = max(progress - start, 0.0) / (1.0 - start) if start < 1 else 0.0
     return 2.0 / (1.0 + math.exp(-gamma * progress)) - 1.0
 
 
 class CenterClassifier(nn.Module):
-    """Classifieur de centre sur les caractéristiques du bottleneck : moyenne spatiale puis petit MLP."""
+    """Classifieur de centre sur les caractéristiques du bottleneck : moyenne spatiale, LayerNorm, petit MLP.
+
+    La LayerNorm (sans paramètres) rend l'entrée du classifieur indépendante de l'échelle des
+    caractéristiques : l'encodeur ne peut pas « tromper » le classifieur en faisant exploser leur
+    norme, ce qui faisait diverger la perte du centre (run rq3-dann-pli0 sur Colab).
+    """
 
     def __init__(self, in_channels, n_centers, hidden=64, dropout=0.25):
         super().__init__()
         self.pool = nn.AdaptiveAvgPool3d(1)
-        self.head = nn.Sequential(nn.Flatten(), nn.Linear(in_channels, hidden), nn.ReLU(inplace=True),
+        self.head = nn.Sequential(nn.Flatten(), nn.LayerNorm(in_channels, elementwise_affine=False),
+                                  nn.Linear(in_channels, hidden), nn.ReLU(inplace=True),
                                   nn.Dropout(dropout), nn.Linear(hidden, n_centers))
 
     def forward(self, features):
@@ -88,10 +96,10 @@ class DANNWrapper(nn.Module):
     classifieur remonte dans l'encodeur à travers la couche d'inversion.
     """
 
-    def __init__(self, unet, n_centers, bottleneck=None, feature_channels=None, hidden=64, gamma=10.0):
+    def __init__(self, unet, n_centers, bottleneck=None, feature_channels=None, hidden=64, gamma=10.0, start=0.0):
         super().__init__()
         self.unet = unet
-        self.gamma = gamma
+        self.gamma, self.start = gamma, start
         self.grl = GradientReversal(0.0)
         bottleneck = bottleneck if bottleneck is not None else find_bottleneck(unet)
         feature_channels = feature_channels or getattr(unet, "channels", [None])[-1]
@@ -106,7 +114,7 @@ class DANNWrapper(nn.Module):
 
     def set_progress(self, progress):
         """Fixe lambda selon l'avancement de l'entraînement (0 à 1) ; renvoie la valeur."""
-        self.grl.lambda_ = ganin_lambda(progress, self.gamma)
+        self.grl.lambda_ = ganin_lambda(progress, self.gamma, self.start)
         return self.grl.lambda_
 
     def forward(self, images):

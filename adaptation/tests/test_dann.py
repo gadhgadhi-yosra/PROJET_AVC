@@ -94,3 +94,16 @@ def test_erreurs():
     with pytest.raises(ValueError, match="absents"):
         center_labels(["SOOP"], ["R009"])
     assert CenterClassifier(8, 3)(torch.randn(2, 8, 4, 4, 4)).shape == (2, 3)
+
+
+def test_lambda_retarde_et_progressif():
+    assert ganin_lambda(0.05, gamma=5, start=0.05) == 0 and ganin_lambda(0.04, gamma=5, start=0.05) == 0
+    assert ganin_lambda(0.2, gamma=5, start=0.05) < ganin_lambda(0.2)  # montée plus lente que Ganin (gamma 10)
+    assert ganin_lambda(1.0, gamma=5, start=0.05) == pytest.approx(2 / (1 + math.exp(-5)) - 1)
+
+
+def test_classifieur_insensible_a_l_echelle():
+    """LayerNorm avant le MLP : multiplier les caractéristiques par 1 000 ne change pas les logits."""
+    classifier = CenterClassifier(8, 3).eval()
+    features = torch.randn(2, 8, 4, 4, 4)
+    assert torch.allclose(classifier(features), classifier(1000 * features), rtol=1e-3, atol=1e-3)

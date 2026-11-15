@@ -107,6 +107,8 @@ La cellule « données » des notebooks a été vérifiée en local sur un faux 
 
 ## DANN (Ganin et al., *JMLR* 2016)
 
+**Réglage RQ3 (v2, run `rq3-dann-v2-pli0`)** : la première run Colab divergeait (perte totale 10 508 à l'itération 100, 33 M à 400). La perte du centre (poids 1, ~ln 39 = 3,7 au départ) dominait la perte totale et le clipping, et le classifieur lisait les caractéristiques du bottleneck sans normalisation : l'encodeur pouvait en faire exploser l'échelle. Correctif : LayerNorm (sans paramètres) après le pooling global, `dann_weight` = 0,1, lambda nul sur les 5 premiers % puis montée de Ganin avec gamma = 5, `perte_segmentation`, `perte_centre` et lambda à chaque ligne de progression, arrêt si la perte totale dépasse 100. Essai local (RTX 3050, 300 itérations, lot complet) : perte de segmentation 1,63 → 1,07 comme la baseline, perte du centre entre 3,5 et 3,9, y compris avec lambda montant à 0,78.
+
 ```python
 from monai.networks.nets import UNet
 from adaptation.dann import DANNWrapper, center_labels, dann_loss

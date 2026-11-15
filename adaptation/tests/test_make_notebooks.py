@@ -105,7 +105,7 @@ def test_fichiers_generes(tmp_path, monkeypatch):
                                       "--colab-dir", str(tmp_path / "c")])
     mk.main()
     colab = sorted(path.name for path in (tmp_path / "c").glob("*.ipynb"))
-    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-bigaug-pli0.ipynb", "rq3-dann-pli0.ipynb",
+    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-bigaug-pli0.ipynb", "rq3-dann-v2-pli0.ipynb",
                      "rq3-histogram-matching-pli0.ipynb"]
     kernels = {path.parent.name: json.loads(path.read_text()) for path in (tmp_path / "k").rglob("kernel-metadata.json")}
     assert set(kernels) == {"01_intensite", "03_fda", "07_adaptation_continue"}
@@ -114,7 +114,7 @@ def test_fichiers_generes(tmp_path, monkeypatch):
     kaggle_cells = "".join(map("".join, (c["source"] for c in json.loads(
         (tmp_path / "k" / "01_intensite" / "01_intensite.ipynb").read_text(encoding="utf-8"))["cells"])))
     assert "--resume\"]" not in kaggle_cells and "google.colab" not in kaggle_cells  # Kaggle : comme avant
-    colab_notebook = json.loads((tmp_path / "c" / "rq3-dann-pli0.ipynb").read_text(encoding="utf-8"))
+    colab_notebook = json.loads((tmp_path / "c" / "rq3-dann-v2-pli0.ipynb").read_text(encoding="utf-8"))
     colab_source = "".join(map("".join, (c["source"] for c in colab_notebook["cells"])))
     assert colab_notebook["metadata"]["accelerator"] == "GPU"
     assert '"--technique", "dann"' in colab_source and '"--num-workers", "4"' in colab_source
@@ -194,3 +194,22 @@ def test_colab_adaptation_continue(colab):
     namespace = execute(mk.continual_notebook(commit="abc1234", colab=True), stop=8)
     assert namespace["CHECKPOINT"] == run / "best.pt"
     assert namespace["OUTPUT"] == root / "drive" / "MyDrive" / "PROJET_AVC" / "rq3-adaptation-continue-pli0" / "adaptation_continue"
+
+
+def test_commits_acceptes_par_ordre_de_preference(kaggle):
+    """Deux versions du code présentes : la première acceptée l'emporte ; une seule acceptée suffit."""
+    second = kaggle / "input" / "autre-version"
+    second.mkdir()
+    with zipfile.ZipFile(next((kaggle / "input" / "projet-avc-code").glob("*.zip"))) as source,             zipfile.ZipFile(second / "projet_avc_code.zip", "w") as target:
+        for item in source.infolist():
+            data = source.read(item)
+            target.writestr(item, json.dumps({"commit": "def5678", "message": "b"}) if item.filename == "VERSION.json" else data)
+    namespace = execute(mk.notebook("01_intensite", "intensity", "I", "7 h", commit=("def5678", "abc1234")), stop=2)
+    assert namespace["VERSION"]["commit"] == "def5678"
+    namespace = execute(mk.notebook("01_intensite", "intensity", "I", "7 h", commit=("0000000", "abc1234")), stop=2)
+    assert namespace["VERSION"]["commit"] == "abc1234"
+
+
+def test_version_du_code_epinglee():
+    metadata = mk.kernel_metadata("01_intensite", "rq3-intensity-pli0", code_version=7)
+    assert metadata["dataset_sources"] == ["fayfahachicha/atlas-c1-processed", "fayfahachicha/projet-avc-code/7"]

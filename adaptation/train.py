@@ -91,8 +91,12 @@ class RunConfig:
     # NaN dès ~170 itérations et l'échelle du scaler s'effondre (diagnostic rq3-diag-nan, variantes A à D).
     amp: bool = False
     grad_clip: float | None = 12.0          # norme globale des gradients (None : pas de clipping)
-    dann_weight: float = 1.0
-    dann_gamma: float = 10.0
+    # DANN : la perte du centre vaut ~ln(39) = 3,7 au départ contre ~1 pour la segmentation ; avec un poids 1,
+    # elle domine la perte totale et la norme des gradients (clipping à 12). Poids 0,1 : terme adversarial
+    # présent mais inférieur à la segmentation ; l'encodeur reçoit au plus 0,1 × le gradient du centre.
+    dann_weight: float = 0.1
+    dann_gamma: float = 5.0                 # montée de Ganin plus lente (10 dans l'article)
+    dann_start: float = 0.05                # lambda nul sur les 5 premiers % (2 000 itérations)
     sw_overlap: float = 0.25
     sw_batch: int = 2
     evaluation_splits: tuple = ("id_test", "ood_test")
@@ -286,7 +290,7 @@ def technique_hooks(cfg, centers):
     wrap_model = extra_loss = None
     if spec.get("dann"):
         def wrap_model(network):
-            return DANNWrapper(network, n_centers=len(centers), gamma=cfg.dann_gamma)
+            return DANNWrapper(network, n_centers=len(centers), gamma=cfg.dann_gamma, start=cfg.dann_start)
 
         def extra_loss(aux, batch):
             labels = center_labels(batch["site"], centers).to(aux.device)
@@ -455,14 +459,18 @@ class DivergenceGuard:
     signifie que l'entraînement est bloqué (échelle qui s'effondre vers 0).
     """
 
-    def __init__(self, max_skipped=50):
+    def __init__(self, max_skipped=50, max_loss=100.0):
         self.max_skipped = max_skipped
+        self.max_loss = max_loss  # perte Dice + BCE de l'ordre de 1 : au-delà de 100, l'entraînement diverge
         self.consecutive_skipped = 0
         self.skipped = 0
 
     def check(self, iteration, loss, model, skipped):
         if not math.isfinite(loss):
             raise TrainingDiverged(f"Itération {iteration} : perte non finie ({loss}) ; arrêt de l'entraînement")
+        if self.max_loss is not None and loss > self.max_loss:
+            raise TrainingDiverged(f"Itération {iteration} : perte totale {loss:.4g} > {self.max_loss:g} "
+                                   "(divergence) ; arrêt de l'entraînement")
         if not finite_parameters(model):
             raise TrainingDiverged(f"Itération {iteration} : poids non finis après la mise à jour ; arrêt de l'entraînement")
         self.skipped += int(skipped)
@@ -589,10 +597,15 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
             now = time.time()
             seconds = (now - window_start) / max(state["iteration"] - window_iteration, 1)
             remaining = (cfg.max_iterations - state["iteration"]) * seconds / 3600 if cfg.max_iterations else None
-            recent = [l for l, _ in running[-cfg.log_every:]]
-            print(dict(progression=state["iteration"], heures=round((now - started) / 3600, 3),
-                       s_par_iteration=round(seconds, 3), perte=round(float(np.mean(recent)), 4), lr=f"{lr:.2e}",
-                       heures_restantes=None if remaining is None else round(remaining, 2)), flush=True)
+            recent = running[-cfg.log_every:]
+            line = dict(progression=state["iteration"], heures=round((now - started) / 3600, 3),
+                        s_par_iteration=round(seconds, 3), perte=round(float(np.mean([l for l, _ in recent])), 4),
+                        lr=f"{lr:.2e}", heures_restantes=None if remaining is None else round(remaining, 2))
+            if lambda_ is not None:  # DANN : termes de la perte et lambda à chaque ligne
+                line.update(perte_segmentation=round(float(np.mean([p["segmentation"] for _, p in recent])), 4),
+                            perte_centre=round(float(np.mean([p.get("centre", np.nan) for _, p in recent])), 4),
+                            **{"lambda": round(lambda_, 4)})
+            print(line, flush=True)
             window_start, window_iteration = now, state["iteration"]
         if state["iteration"] % cfg.validate_every == 0:
             state["elapsed"] = time.time() - started

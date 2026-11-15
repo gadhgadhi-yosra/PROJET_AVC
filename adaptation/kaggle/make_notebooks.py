@@ -34,12 +34,13 @@ RUNS = [  # fichier, technique, titre, durée estimée sur une T4 Kaggle (entra�
     ("04_histogram_matching", "histogram_matching", "Histogram matching (aussi appliqué à la validation et au test)", "7 à 7 h 30"),
     ("05_dann", "dann", "DANN (classifieur de centre et inversion de gradient)", "6 h 30 à 7 h"),
 ]
-COLAB_DURATIONS = {"dann": "7 à 8 h 30", "intensity": "10 h 30 à 11 h 30 (au-delà du garde-fou de 10 h)",
+COLAB_DURATIONS = {"dann": "6 h 30 à 8 h (0,40 s/it mesuré sur Colab)", "intensity": "10 h 30 à 11 h 30 (au-delà du garde-fou de 10 h)",
                    "bigaug": "plus de 11 h (au-delà du garde-fou de 10 h)", "histogram_matching": "10 à 11 h"}
 # Répartition : Kaggle (compte du propriétaire, 2 sessions GPU) et Google Colab (1 session, reprise sur Drive).
 # Colab (2 processeurs) mesuré à 0,80-0,87 s/it pour l'intensité : DANN, la moins coûteuse à préparer, y passe.
 ASSIGNMENT = {"kaggle": ["baseline", "fda", "intensity"], "colab": ["dann", "bigaug", "histogram_matching"]}
-SLUGS = {"baseline": f"rq3-baseline-fp32-pli{FOLD}"}
+# Baseline fp32 et DANN v2 (classifieur normalisé, poids 0,1) : slugs propres, jamais les sorties des anciennes runs.
+SLUGS = {"baseline": f"rq3-baseline-fp32-pli{FOLD}", "dann": f"rq3-dann-v2-pli{FOLD}"}
 CONTINUAL = ("07_adaptation_continue", f"rq3-adaptation-continue-pli{FOLD}")
 
 
@@ -158,7 +159,7 @@ INPUT = Path(os.environ.get("RQ3_INPUT", "/kaggle/input"))      # datasets
 WORKING = Path(os.environ.get("RQ3_WORKING", "/kaggle/working"))  # code
 RUNS_DIR = Path(os.environ.get("RQ3_RUNS", str(WORKING / "runs")))  # toutes les sorties des runs
 SCRATCH = Path(os.environ.get("RQ3_TMP", "/tmp/rq3"))            # liens vers les données, jamais dans les sorties
-EXPECTED_COMMIT = @@COMMIT@@  # commit attendu dans VERSION.json du dataset de code (None : pas de contrôle)
+EXPECTED_COMMIT = @@COMMIT@@  # commit(s) accepté(s) dans VERSION.json, par ordre de préférence (None : pas de contrôle)
 REFERENCE = @@REFERENCE@@  # environnement Kaggle de la baseline
 differences = []
 if REFERENCE["gpu"] not in GPU:
@@ -187,7 +188,10 @@ found = [(path, code_version(path)) for path in candidates]
 found = [(path, version) for path, version in found if version]
 if not found:
     raise FileNotFoundError("Dataset projet-avc-code introuvable : l'ajouter en entrée, puis relancer.")
-matching = [(path, version) for path, version in found if EXPECTED_COMMIT in (None, version["commit"])]
+accepted = None if EXPECTED_COMMIT is None else (
+    (EXPECTED_COMMIT,) if isinstance(EXPECTED_COMMIT, str) else tuple(EXPECTED_COMMIT))
+matching = sorted(((path, version) for path, version in found if accepted is None or version["commit"] in accepted),
+                  key=lambda item: accepted.index(item[1]["commit"]) if accepted else 0)
 if not matching:
     raise RuntimeError(f"VERSION.json : commit {sorted({v['commit'] for _, v in found})} au lieu de {EXPECTED_COMMIT}. "
                        "Mettre l'entrée projet-avc-code à sa dernière version, puis relancer.")
@@ -442,11 +446,15 @@ print((Path("/kaggle/working/diag_nan") / "resume.json").read_text())
     return {"cells": cells, "metadata": notebook_metadata(), "nbformat": 4, "nbformat_minor": 5}
 
 
-def kernel_metadata(name, slug, kernel_sources=()):
-    """Métadonnées de `kaggle kernels push` : notebook privé, GPU, Internet, les deux datasets privés."""
+def kernel_metadata(name, slug, kernel_sources=(), code_version=None):
+    """Métadonnées de `kaggle kernels push` : notebook privé, GPU, Internet, les deux datasets privés.
+
+    code_version : numéro de version du dataset de code à attacher (défaut : la dernière).
+    """
+    code_source = f"{USERNAME}/{CODE_DATASET}" + (f"/{code_version}" if code_version else "")
     return {"id": f"{USERNAME}/{slug}", "title": slug, "code_file": f"{name}.ipynb", "language": "python",
             "kernel_type": "notebook", "is_private": True, "enable_gpu": True, "enable_tpu": False,
-            "enable_internet": True, "dataset_sources": [f"{USERNAME}/{DATASET}", f"{USERNAME}/{CODE_DATASET}"],
+            "enable_internet": True, "dataset_sources": [f"{USERNAME}/{DATASET}", code_source],
             "competition_sources": [], "kernel_sources": [f"{USERNAME}/{slug}" for slug in kernel_sources]}
 
 
@@ -466,7 +474,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--kernels-dir", type=Path, help="dossiers kaggle kernels push (runs Kaggle)")
     parser.add_argument("--colab-dir", type=Path, help="notebooks Google Colab (<slug>.ipynb)")
-    parser.add_argument("--commit", help="commit attendu dans VERSION.json (défaut : HEAD) ; celui du dataset de code")
+    parser.add_argument("--commit", help="commit(s) accepté(s) dans VERSION.json, séparés par des virgules, par ordre "
+                                          "de préférence (défaut : HEAD)")
+    parser.add_argument("--code-version", type=int, help="kernels Kaggle : version du dataset de code à attacher")
     args = parser.parse_args()
     for name, technique, title, duration in RUNS:
         write_notebook(HERE / f"{name}.ipynb", notebook(name, technique, title, duration))
@@ -477,6 +487,7 @@ def main():
         return
     commit = args.commit or subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--short",
                                             "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+    commit = tuple(commit.split(",")) if "," in commit else commit
     by_technique = {technique: (name, title, duration) for name, technique, title, duration in RUNS}
     if args.kernels_dir:
         for technique in ASSIGNMENT["kaggle"]:
@@ -484,11 +495,11 @@ def main():
                 continue  # déjà poussée (rq3-baseline-fp32-pli0, version 1) ; dossier 00_baseline inchangé
             name, title, duration = by_technique[technique]
             write_kernel(args.kernels_dir / name, name, notebook(name, technique, title, duration, commit),
-                         kernel_metadata(name, kernel_slug(technique)))
+                         kernel_metadata(name, kernel_slug(technique), code_version=args.code_version))
             print(args.kernels_dir / name, kernel_slug(technique))
         name, slug = CONTINUAL
         write_kernel(args.kernels_dir / name, name, continual_notebook(commit),
-                     kernel_metadata(name, slug, kernel_sources=[kernel_slug("baseline")]))
+                     kernel_metadata(name, slug, kernel_sources=[kernel_slug("baseline")], code_version=args.code_version))
         print(args.kernels_dir / name, slug)
     if args.colab_dir:
         for technique in ASSIGNMENT["colab"]:

@@ -254,3 +254,11 @@ def test_sauvegarde_atomique(tmp_path, monkeypatch):
         train_module.save_checkpoint(path, model, optimizer, scaler, dict(iteration=2), RunConfig())
     monkeypatch.undo()
     assert torch.load(path, weights_only=False)["state"]["iteration"] == 1
+
+
+def test_garde_fou_perte_trop_grande():
+    from adaptation.train import DivergenceGuard, TrainingDiverged
+    model = torch.nn.Linear(2, 1)
+    DivergenceGuard().check(1, 99.0, model, skipped=False)
+    with pytest.raises(TrainingDiverged, match=r"Itération 7 : perte totale 1.051e\+04 > 100 \(divergence\)"):
+        DivergenceGuard().check(7, 10508.0, model, skipped=False)
