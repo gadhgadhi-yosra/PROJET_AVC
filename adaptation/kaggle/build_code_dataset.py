@@ -8,6 +8,7 @@
 jamais `generalization/figures/`, `adaptation/runs/` ni `data/`) :
 - `generalization/` et `adaptation/` ;
 - `baselines/common.py` (métriques ISLES importées par adaptation/train.py) ;
+- `analysis/center_distance.py` (distance de domaine, contrat C6, importée par adaptation/continual.py) ;
 - `splits.json` (découpages, exigés par les configurations) ;
 - `VERSION.json` : branche, commit et date, affichés par les notebooks.
 Refuse de construire si `generalization/` ou `adaptation/` ont des modifications non commitées.
@@ -21,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PATHS = ["generalization", "adaptation", "baselines/common.py", "splits.json"]
+PATHS = ["generalization", "adaptation", "baselines/common.py", "analysis/center_distance.py", "splits.json"]
 FORBIDDEN = (".nii", ".nii.gz", ".pt", ".pth", ".ckpt", ".npy", ".npz", ".png", ".jpg")
 
 

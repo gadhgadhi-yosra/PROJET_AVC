@@ -7,6 +7,8 @@ Modules de la question RQ3 (§3.5) et de l'adaptation continue contrôlée (§5.
 | `train.py` | Boucle MONAI 3D commune : entraînement, validation sur le pli, `predict()`, évaluation par sujet (CSV), TENT au test |
 | `dann.py` | Couche d'inversion de gradient, planification de Ganin, classifieur de centre, `DANNWrapper`, `dann_loss` |
 | `tent.py` | `configure_tent`, `collect_params`, entropie par voxel dans le cerveau, `Tent` avec `reset()` |
+| `continual.py` | Adaptation continue (version réduite) : centres OOD un par un, évaluation préquentielle, 4 stratégies (figé, auto-apprentissage, TENT, contrôlée), oubli |
+| `aggregate_rq3.py` | Tableau RQ3 à partir des sorties des runs : Dice ID / OOD / écart (IC 95 % bootstrap), Wilcoxon contre la baseline, par centre et par taille de lésion, figures |
 | `kaggle/` | Notebooks Kaggle (une run par technique), leur générateur et la préparation du dataset privé |
 | `tests/` | Tests pytest sur de petits UNet MONAI 3D (CPU), le jeu C1 synthétique et de vrais patches C1 de 64³ |
 
@@ -47,28 +49,29 @@ Techniques : `baseline`, `intensity`, `bigaug`, `fda`, `histogram_matching`, `da
 
 ## Kaggle : tableau d'ablation RQ3
 
-Six notebooks dans `kaggle/`, générés par `kaggle/make_notebooks.py` : **pli 0, graine 2026, 40 000 itérations** pour tous.
+Six notebooks dans `kaggle/`, générés par `kaggle/make_notebooks.py` : **pli 0, graine 2026, 40 000 itérations, fp32, clipping à 12** pour tous.
 
-| Notebook | Technique | Durée estimée (T4) |
-|---|---|---|
-| `00_baseline.ipynb` | baseline, puis TENT au test | 2 à 3 h |
-| `01_intensite.ipynb` | augmentation d'intensité | 3 à 4 h |
-| `02_bigaug.ipynb` | preset BigAug | 4 à 6 h |
-| `03_fda.ipynb` | FDA | 4 à 6 h |
-| `04_histogram_matching.ipynb` | histogram matching | 3 à 5 h |
-| `05_dann.ipynb` | DANN | 2 à 3 h |
+| Notebook | Slug Kaggle | Technique | Compte | Durée estimée (T4, fp32) |
+|---|---|---|---|---|
+| `00_baseline.ipynb` | `rq3-baseline-fp32-pli0` | baseline, puis TENT au test | propriétaire | 6 h 30 à 7 h 30 |
+| `01_intensite.ipynb` | `rq3-intensity-pli0` | augmentation d'intensité | Yosra | 6 h à 7 h |
+| `02_bigaug.ipynb` | `rq3-bigaug-pli0` | preset BigAug | Anas | 6 h à 7 h |
+| `03_fda.ipynb` | `rq3-fda-pli0` | FDA | propriétaire | 7 h à 9 h |
+| `04_histogram_matching.ipynb` | `rq3-histogram-matching-pli0` | histogram matching | Yosra | 6 h 30 à 7 h 30 |
+| `05_dann.ipynb` | `rq3-dann-pli0` | DANN | Anas | 6 h à 7 h |
+| `07_adaptation_continue.ipynb` | `rq3-adaptation-continue-pli0` | adaptation continue sur `best.pt` de la baseline | propriétaire | 30 à 50 min |
 
-Environ 20 à 27 h de GPU pour le pli 0 : une semaine sur trois comptes (environ 30 h chacun). Les durées sont des estimations (mesures locales sur la RTX 3050 et un processeur 4 cœurs) : la première run (baseline) les confirmera. Les autres plis viendront ensuite si le budget le permet ; la référence de FDA et de l'histogram matching suit alors le pli (`fold_reference_sites`).
+Environ 40 à 45 h de GPU pour le pli 0, sur trois comptes (2 sessions GPU en arrière-plan par compte). Répartition dans `ASSIGNMENT` ; `--handoff-dir` écrit les notebooks à importer à la main (`<prénom>/<slug>.ipynb` et `LISEZMOI.md`). Si l'itération 100 dépasse 0,75 s/it, le journal le signale (40 000 itérations ne tiendraient pas dans le budget de 10 h) sans arrêter la run. Les autres plis viendront ensuite si le budget le permet ; la référence de FDA et de l'histogram matching suit alors le pli (`fold_reference_sites`).
 
-Chaque notebook prend le code dans le dataset privé `projet-avc-code` (le dépôt GitHub devient privé), affiche son `VERSION.json` (branche et commit), installe MONAI et TorchIO, recrée `data/processed` par des liens vers les dossiers de sujets du dataset `atlas-c1-processed` (que Kaggle ait décompressé les archives ou non), vérifie que `splits.json` est identique dans les données et dans le code, puis lance `train.py`. Réglages Kaggle : accélérateur *GPU T4*, Internet activé, les deux datasets privés en entrée, notebook privé. Une session interrompue reprend avec `--resume` après avoir copié `last.pt` de la sortie précédente.
+Chaque notebook s'arrête avec un message clair sans GPU, cherche récursivement sous `/kaggle/input` le code (dataset privé `projet-avc-code`) et les données (un dataset partagé peut être monté sous un autre chemin), vérifie que `VERSION.json` porte le commit attendu (copies Kaggle), installe MONAI et TorchIO, recrée `data/processed` (hors des sorties) par des liens vers les dossiers de sujets du dataset `atlas-c1-processed` (que Kaggle ait décompressé les archives ou non), vérifie que `splits.json` est identique dans les données et dans le code, puis lance `train.py`. Réglages Kaggle : accélérateur *GPU T4*, Internet activé, les deux datasets privés en entrée, notebook privé. Une session interrompue reprend avec `--resume` après avoir copié `last.pt` de la sortie précédente.
 
 ### Lancer un notebook depuis le poste (`kaggle kernels push`)
 
 ```powershell
 .venv-dl\Scripts\python adaptation\kaggle\make_notebooks.py --kernels-dir data\kaggle_kernels   # un dossier par notebook
-kaggle kernels push -p data\kaggle_kernels\00_baseline --accelerator NvidiaTeslaT4
-kaggle kernels status fayfahachicha/rq3-baseline-pli0
-kaggle kernels output fayfahachicha/rq3-baseline-pli0 -p adaptation\runs\kaggle_baseline_pli0   # à la fin
+kaggle kernels push -p data\kaggle_kernels\03_fda --accelerator NvidiaTeslaT4 -t 43200
+kaggle kernels output fayfahachicha/rq3-fda-pli0 -p data\kaggle_sorties\rq3-fda-pli0   # à la fin
+.venv-dl\Scripts\python -m adaptation.aggregate_rq3 data\kaggle_sorties                  # tableau RQ3 et figures
 ```
 
 `kernel-metadata.json` : notebook privé, GPU, Internet, datasets `fayfahachicha/atlas-c1-processed` et `fayfahachicha/projet-avc-code`. Le CLI Kaggle 2.2.5 s'installe avec `uv tool install kaggle --with six` (dépendance `six` oubliée par le paquet) ; sous Windows, lancer `kaggle datasets create` depuis le dossier du dataset (`-p .`), sinon le CLI échoue sur un nom de fichier temporaire.
@@ -81,7 +84,7 @@ cd data\kaggle_projet_avc_code ; kaggle datasets create -p . -r skip            
 cd data\kaggle_projet_avc_code ; kaggle datasets version -p . -r skip -m "message"   # après chaque commit utile
 ```
 
-`projet_avc_code.zip` contient `generalization/`, `adaptation/`, `baselines/common.py` (métriques importées par `train.py`), `splits.json` et `VERSION.json`. Le script refuse de construire si `generalization/` ou `adaptation/` ont des modifications non commitées, et si l'archive contient une image, un volume ou un checkpoint.
+`projet_avc_code.zip` contient `generalization/`, `adaptation/`, `baselines/common.py` (métriques importées par `train.py`), `analysis/center_distance.py` (distance de domaine utilisée par `continual.py`), `splits.json` et `VERSION.json`. Le script refuse de construire si `generalization/` ou `adaptation/` ont des modifications non commitées, et si l'archive contient une image, un volume ou un checkpoint.
 
 ### Dataset Kaggle privé des données
 
