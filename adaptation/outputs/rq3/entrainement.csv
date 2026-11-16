@@ -1,0 +1,5 @@
+technique,run,iterations,heures,best_dice_validation,best_iteration,source
+baseline,unet3d_baseline_pli0,40000.0,4.53,0.4299138418075864,30000.0,data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume.json
+baseline+tent,unet3d_baseline_pli0,,,,,data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume_tent.json
+fda,unet3d_fda_pli0,40000.0,6.78,0.4368684822882016,36000.0,data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resume.json
+intensity,unet3d_intensity_pli0,40000.0,5.0,0.4330406524360104,38000.0,data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resume.json
