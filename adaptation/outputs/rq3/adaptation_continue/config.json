@@ -1,0 +1,19 @@
+{
+  "checkpoint": "/kaggle/input/notebooks/fayfahachicha/rq3-baseline-fp32-pli0/runs/unet3d_baseline_pli0/best.pt",
+  "technique": "baseline",
+  "fold": 0,
+  "subjects_per_center": 24,
+  "lot_size": 4,
+  "patches_per_subject": 4,
+  "learning_rate": 0.0001,
+  "reference_per_site": 3,
+  "detection_quantile": 0.95,
+  "guard_subjects": 8,
+  "guard_tolerance": 0.01,
+  "source_replay_subjects": 8,
+  "replay_per_center": 8,
+  "replay_weight": 1.0,
+  "forgetting_id_subjects": 16,
+  "forgetting_per_center": 4,
+  "seed": 2026
+}

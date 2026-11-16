@@ -285,7 +285,7 @@ def figures(rows, table, centers, sizes, folder):
             data = sizes[(sizes["technique"] == technique) & (sizes["split"] == split)]
             data = data.set_index("taille").reindex(SIZE_LABELS)
             ax.plot(SIZE_LABELS, data["dice"], marker="o", markersize=5, linewidth=2,
-                    color=COLORS[index % len(COLORS)], label=LABELS.get(technique, technique))
+                    color=COLORS[(ORDER.index(technique) if technique in ORDER else index) % len(COLORS)], label=LABELS.get(technique, technique))
         ax.set_title("Test " + split.replace("_test", "").upper(), color=INK, loc="left")
         ax.set_xlabel("Volume de la lésion")
         ax.set_ylim(0, 1)

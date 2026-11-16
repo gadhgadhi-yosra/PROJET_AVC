@@ -4,23 +4,23 @@ Dice moyen sur les sujets à lésion non vide. Distance C6 : Wasserstein entre h
 
 ## Centres OOD
 
-| Centre | Sujets (lésion) | Vol. médian (ml) | J post-AVC | Distance W1 | Contraste | Baseline | Intensité | FDA | Baseline + TENT | Continue (contrôlée) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| R008 | 7 (7) | 0.95 | 1 | 0.216 | -0.17 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| R031 | 37 (37) | 6.74 | 138 | 0.164 | -0.98 | 0.62 | 0.67 | 0.65 | 0.62 | 0.58 |
-| R028 | 26 (26) | 4.94 | 576 | 0.157 | -0.82 | 0.66 | 0.65 | 0.64 | 0.66 | 0.66 |
-| SOOP | 169 (167) | 22.75 | - | 0.023 | -0.69 | 0.54 | 0.57 | 0.54 | 0.52 | 0.44 |
-| R053 | 5 (4) | 0.81 | 25 | 0.020 | -0.50 | 0.20 | 0.20 | 0.22 | 0.20 | 0.20 |
-| R034 | 24 (24) | 2.38 | 1506 | 0.014 | -0.64 | 0.63 | 0.65 | 0.66 | 0.63 | 0.63 |
+| Centre | Sujets (lésion) | Vol. médian (ml) | J post-AVC | Distance W1 | Contraste | Baseline | Intensité | FDA | DANN | Baseline + TENT | Continue (contrôlée) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R008 | 7 (7) | 0.95 | 1 | 0.216 | -0.17 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| R031 | 37 (37) | 6.74 | 138 | 0.164 | -0.98 | 0.62 | 0.67 | 0.65 | 0.63 | 0.62 | 0.58 |
+| R028 | 26 (26) | 4.94 | 576 | 0.157 | -0.82 | 0.66 | 0.65 | 0.64 | 0.65 | 0.66 | 0.66 |
+| SOOP | 169 (167) | 22.75 | - | 0.023 | -0.69 | 0.54 | 0.57 | 0.54 | 0.53 | 0.52 | 0.44 |
+| R053 | 5 (4) | 0.81 | 25 | 0.020 | -0.50 | 0.20 | 0.20 | 0.22 | 0.25 | 0.20 | 0.20 |
+| R034 | 24 (24) | 2.38 | 1506 | 0.014 | -0.64 | 0.63 | 0.65 | 0.66 | 0.64 | 0.63 | 0.63 |
 
 ## Dice par volume de lésion (test OOD ; ID entre parenthèses)
 
-| Volume | Baseline | Intensité | FDA | Baseline + TENT | Continue (contrôlée) |
-|---|---|---|---|---|---|
-| < 1 ml | 0.31 (n=41) (0.48) | 0.33 (n=41) (0.46) | 0.30 (n=41) (0.44) | 0.32 (n=41) (0.48) | 0.35 (n=23) |
-| 1-10 ml | 0.46 (n=86) (0.58) | 0.50 (n=86) (0.59) | 0.46 (n=86) (0.61) | 0.46 (n=86) (0.58) | 0.48 (n=41) |
-| 10-50 ml | 0.64 (n=80) (0.71) | 0.67 (n=80) (0.74) | 0.66 (n=80) (0.74) | 0.62 (n=80) (0.71) | 0.60 (n=30) |
-| >= 50 ml | 0.74 (n=58) (0.83) | 0.74 (n=58) (0.83) | 0.75 (n=58) (0.84) | 0.71 (n=58) (0.82) | 0.81 (n=13) |
+| Volume | Baseline | Intensité | FDA | DANN | Baseline + TENT | Continue (contrôlée) |
+|---|---|---|---|---|---|---|
+| < 1 ml | 0.31 (n=41) (0.48) | 0.33 (n=41) (0.46) | 0.30 (n=41) (0.44) | 0.29 (n=41) (0.46) | 0.32 (n=41) (0.48) | 0.35 (n=23) |
+| 1-10 ml | 0.46 (n=86) (0.58) | 0.50 (n=86) (0.59) | 0.46 (n=86) (0.61) | 0.45 (n=86) (0.58) | 0.46 (n=86) (0.58) | 0.48 (n=41) |
+| 10-50 ml | 0.64 (n=80) (0.71) | 0.67 (n=80) (0.74) | 0.66 (n=80) (0.74) | 0.63 (n=80) (0.73) | 0.62 (n=80) (0.71) | 0.60 (n=30) |
+| >= 50 ml | 0.74 (n=58) (0.83) | 0.74 (n=58) (0.83) | 0.75 (n=58) (0.84) | 0.75 (n=58) (0.83) | 0.71 (n=58) (0.82) | 0.81 (n=13) |
 
 ## Corrélations de Spearman
 
@@ -29,17 +29,20 @@ Dice moyen sur les sujets à lésion non vide. Distance C6 : Wasserstein entre h
 | centres OOD | wasserstein | Dice baseline | -0.31 | 0.544 | 6 |
 | centres OOD | wasserstein | Dice intensity | -0.20 | 0.704 | 6 |
 | centres OOD | wasserstein | Dice fda | -0.43 | 0.397 | 6 |
+| centres OOD | wasserstein | Dice dann | -0.31 | 0.544 | 6 |
 | centres OOD | wasserstein | Dice baseline+tent | -0.31 | 0.544 | 6 |
 | centres OOD | wasserstein | Dice continue_controlee | -0.31 | 0.544 | 6 |
 | centres OOD | wasserstein | volume médian des lésions | 0.14 | 0.787 | 6 |
 | centres OOD | mmd | Dice baseline | -0.14 | 0.787 | 6 |
 | centres OOD | mmd | Dice intensity | -0.26 | 0.623 | 6 |
 | centres OOD | mmd | Dice fda | -0.37 | 0.468 | 6 |
+| centres OOD | mmd | Dice dann | -0.14 | 0.787 | 6 |
 | centres OOD | mmd | Dice baseline+tent | -0.14 | 0.787 | 6 |
 | centres OOD | mmd | Dice continue_controlee | -0.14 | 0.787 | 6 |
 | centres OOD | mmd | volume médian des lésions | -0.37 | 0.468 | 6 |
 | centres de test ID + OOD | wasserstein | Dice baseline | 0.09 | 0.575 | 44 |
 | centres de test ID + OOD | wasserstein | Dice baseline+tent | 0.09 | 0.558 | 44 |
+| centres de test ID + OOD | wasserstein | Dice dann | 0.05 | 0.760 | 44 |
 | centres de test ID + OOD | wasserstein | Dice fda | 0.05 | 0.727 | 44 |
 | centres de test ID + OOD | wasserstein | Dice intensity | 0.12 | 0.444 | 44 |
 | sujets OOD | volume de la lésion | Dice intensity | 0.53 | 0.000 | 265 |

@@ -1,5 +1,7 @@
 technique,run,iterations,heures,best_dice_validation,best_iteration,source
-baseline,unet3d_baseline_pli0,40000.0,4.53,0.4299138418075864,30000.0,data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume.json
-baseline+tent,unet3d_baseline_pli0,,,,,data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume_tent.json
-fda,unet3d_fda_pli0,40000.0,6.78,0.4368684822882016,36000.0,data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resume.json
-intensity,unet3d_intensity_pli0,40000.0,5.0,0.4330406524360104,38000.0,data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resume.json
+baseline,unet3d_baseline_pli0,40000.0,4.53,0.4299138418075864,30000.0,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume.json
+baseline+tent,unet3d_baseline_pli0,,,,,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resume_tent.json
+intensity,unet3d_intensity_pli0,40000.0,5.0,0.4330406524360104,38000.0,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resume.json
+fda,unet3d_fda_pli0,40000.0,6.78,0.4368684822882016,36000.0,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resume.json
+dann,unet3d_dann_pli0,40000.0,5.21,0.4361643793385335,24000.0,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-dann-v2-reprise-pli0\runs\unet3d_dann_pli0\resume.json
+,,,,,,C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-adaptation-continue-pli0\adaptation_continue\resume.json

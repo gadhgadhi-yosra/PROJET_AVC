@@ -38,12 +38,13 @@ DISTANCES = REPO_ROOT / "analysis" / "reports" / "center_distances_v1.csv"
 PREQUENTIAL_FILE = re.compile(r"(^|/)prequentiel\.csv$")
 CONTINUAL = {"fige": "continue_fige", "controlee": "continue_controlee", "tent": "continue_tent",
              "auto_apprentissage": "continue_auto_apprentissage"}
-TECHNIQUE_ORDER = ["baseline", "intensity", "fda", "baseline+tent", "continue_fige", "continue_controlee",
-                   "continue_tent", "continue_auto_apprentissage"]
+# Techniques entraînées (une run chacune) ; les absentes sont ignorées.
+TRAINED = ["baseline", "intensity", "bigaug", "fda", "histogram_matching", "dann", "baseline+tent"]
+TECHNIQUE_ORDER = TRAINED + ["continue_fige", "continue_controlee", "continue_tent", "continue_auto_apprentissage"]
 TECHNIQUE_LABELS = {**LABELS, "continue_fige": "Continue (figé)", "continue_controlee": "Continue (contrôlée)",
                     "continue_tent": "Continue (TENT)", "continue_auto_apprentissage": "Continue (auto-appr.)"}
 # Colonnes du tableau markdown (les autres stratégies continues restent dans les CSV).
-SHOWN = ["baseline", "intensity", "fda", "baseline+tent", "continue_controlee"]
+SHOWN = TRAINED + ["continue_controlee"]
 ZOOM = ("R008", "R053")
 REFERENCE_TECHNIQUE = "intensity"
 
@@ -171,7 +172,7 @@ def correlations(rows, distances, centers, contrast=None):
         rho, p, n = spearman(centers[metric], centers["volume_median_ml"])
         records.append(dict(niveau="centres OOD", x=metric, y="volume médian des lésions", rho=rho, p=p, n=n))
     # Tous les centres de test (ID et OOD) : plus de points, mais les centres ID sont vus à l'entraînement.
-    all_centers = scored(rows[rows["technique"].isin(["baseline", "intensity", "fda", "baseline+tent"])])
+    all_centers = scored(rows[rows["technique"].isin(TRAINED)])
     all_centers = all_centers.groupby(["technique", "site"])["dice"].mean().reset_index()
     all_centers = all_centers.merge(distances[["site", "wasserstein"]], on="site")
     for technique, group in all_centers.groupby("technique"):
@@ -265,7 +266,7 @@ def figures(rows, centers, sizes, contrast, folder, data_root=None):
     folder.mkdir(parents=True, exist_ok=True)
     paths = []
     shown = [t for t in SHOWN if t in centers]
-    color = {t: COLORS[i % len(COLORS)] for i, t in enumerate(shown)}
+    color = {t: COLORS[i] for i, t in enumerate(SHOWN)}  # couleur fixée par technique, présente ou non
 
     # 1. Dice OOD moyen par centre, centres rangés par distance C6 croissante (techniques décalées).
     ordered = centers.sort_values("wasserstein").reset_index(drop=True)
