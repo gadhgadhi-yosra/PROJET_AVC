@@ -597,13 +597,13 @@ def train(cfg, augment=None, wrap_model=None, extra_loss=None, test_transform=No
             now = time.time()
             seconds = (now - window_start) / max(state["iteration"] - window_iteration, 1)
             remaining = (cfg.max_iterations - state["iteration"]) * seconds / 3600 if cfg.max_iterations else None
-            recent = running[-cfg.log_every:]
+            window = running[-cfg.log_every:]  # pas `recent` : file des états aléatoires sauvegardés dans last.pt
             line = dict(progression=state["iteration"], heures=round((now - started) / 3600, 3),
-                        s_par_iteration=round(seconds, 3), perte=round(float(np.mean([l for l, _ in recent])), 4),
+                        s_par_iteration=round(seconds, 3), perte=round(float(np.mean([l for l, _ in window])), 4),
                         lr=f"{lr:.2e}", heures_restantes=None if remaining is None else round(remaining, 2))
             if lambda_ is not None:  # DANN : termes de la perte et lambda à chaque ligne
-                line.update(perte_segmentation=round(float(np.mean([p["segmentation"] for _, p in recent])), 4),
-                            perte_centre=round(float(np.mean([p.get("centre", np.nan) for _, p in recent])), 4),
+                line.update(perte_segmentation=round(float(np.mean([p["segmentation"] for _, p in window])), 4),
+                            perte_centre=round(float(np.mean([p.get("centre", np.nan) for _, p in window])), 4),
                             **{"lambda": round(lambda_, 4)})
             print(line, flush=True)
             window_start, window_iteration = now, state["iteration"]

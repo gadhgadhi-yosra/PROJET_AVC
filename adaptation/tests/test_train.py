@@ -199,6 +199,7 @@ def test_reprise_meme_trajectoire(synthetic_c1, tmp_path, monkeypatch, technique
     def config(folder):
         cfg = tiny_config(synthetic_c1, tmp_path / folder, technique)
         cfg.max_iterations, cfg.validate_every, cfg.num_workers, cfg.checkpoint_minutes = 6, 3, workers, -1.0
+        cfg.log_every = 2  # lignes de progression entre deux checkpoints : la file des états doit rester intacte
         cfg.evaluation_splits = ()
         return cfg
 
