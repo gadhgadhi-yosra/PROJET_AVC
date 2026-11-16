@@ -38,7 +38,8 @@ COLAB_DURATIONS = {"dann": "6 h 30 à 8 h (0,40 s/it mesuré sur Colab)", "inten
                    "bigaug": "plus de 11 h (au-delà du garde-fou de 10 h)", "histogram_matching": "10 à 11 h"}
 # Répartition : Kaggle (compte du propriétaire, 2 sessions GPU) et Google Colab (1 session, reprise sur Drive).
 # Colab (2 processeurs) mesuré à 0,80-0,87 s/it pour l'intensité : DANN, la moins coûteuse à préparer, y passe.
-ASSIGNMENT = {"kaggle": ["baseline", "fda", "intensity"], "colab": ["dann", "bigaug", "histogram_matching"]}
+# BigAug passée sur Kaggle (plus de GPU Colab) : 6 h 30 à 7 h 30 estimées, dans le quota restant.
+ASSIGNMENT = {"kaggle": ["baseline", "fda", "intensity", "bigaug"], "colab": ["dann", "histogram_matching"]}
 # Baseline fp32 et DANN v2 (classifieur normalisé, poids 0,1) : slugs propres, jamais les sorties des anciennes runs.
 SLUGS = {"baseline": f"rq3-baseline-fp32-pli{FOLD}", "dann": f"rq3-dann-v2-pli{FOLD}"}
 CONTINUAL = ("07_adaptation_continue", f"rq3-adaptation-continue-pli{FOLD}")

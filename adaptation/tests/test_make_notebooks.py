@@ -105,10 +105,10 @@ def test_fichiers_generes(tmp_path, monkeypatch):
                                       "--colab-dir", str(tmp_path / "c")])
     mk.main()
     colab = sorted(path.name for path in (tmp_path / "c").glob("*.ipynb"))
-    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-bigaug-pli0.ipynb", "rq3-dann-v2-pli0.ipynb",
-                     "rq3-histogram-matching-pli0.ipynb"]
+    assert colab == ["rq3-adaptation-continue-pli0.ipynb", "rq3-dann-v2-pli0.ipynb", "rq3-histogram-matching-pli0.ipynb"]
     kernels = {path.parent.name: json.loads(path.read_text()) for path in (tmp_path / "k").rglob("kernel-metadata.json")}
-    assert set(kernels) == {"01_intensite", "03_fda", "07_adaptation_continue"}
+    assert set(kernels) == {"01_intensite", "02_bigaug", "03_fda", "07_adaptation_continue"}
+    assert kernels["02_bigaug"]["id"] == "fayfahachicha/rq3-bigaug-pli0"
     assert kernels["01_intensite"]["id"] == "fayfahachicha/rq3-intensity-pli0"
     assert kernels["07_adaptation_continue"]["kernel_sources"] == ["fayfahachicha/rq3-baseline-fp32-pli0"]
     kaggle_cells = "".join(map("".join, (c["source"] for c in json.loads(
