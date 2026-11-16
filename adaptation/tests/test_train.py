@@ -227,6 +227,17 @@ def test_reprise_meme_trajectoire(synthetic_c1, tmp_path, monkeypatch, technique
     assert a["state"]["best_iteration"] == b["state"]["best_iteration"]
 
 
+def test_reprise_dann_exacte_hors_dropout(synthetic_c1, tmp_path, monkeypatch):
+    """DANN : reprise identique à la run sans coupure, sauf les masques du Dropout du classifieur de centre.
+
+    Ils sont tirés dans le générateur du processus principal (CUDA sur GPU), dont l'état n'est pas dans last.pt :
+    après une reprise, ces masques diffèrent de la run sans coupure. Lots, augmentations, LR, lambda et poids
+    restaurés sont exacts ; le Dropout neutralisé, les poids finaux sont identiques au bit près.
+    """
+    monkeypatch.setattr(torch.nn.Dropout, "forward", lambda self, x: x)
+    test_reprise_meme_trajectoire(synthetic_c1, tmp_path, monkeypatch, "dann", 2)
+
+
 def test_echantillonneur_identique_a_randomsampler():
     from adaptation.train import ResumableSampler
     data = list(range(7))

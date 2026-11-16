@@ -418,6 +418,162 @@ de Wasserstein entre histogrammes d'intensité (`center_distance()`, analysis/).
     return {"cells": cells, "metadata": notebook_metadata(colab), "nbformat": 4, "nbformat_minor": 5}
 
 
+# --- Reprise sur Kaggle d'une run interrompue ailleurs (DANN v2 coupée sur Colab) ---
+
+RESUME = dict(name="08_dann_reprise", slug=f"rq3-dann-v2-reprise-pli{FOLD}", technique="dann",
+              checkpoints=f"rq3-dann-v2-checkpoints-pli{FOLD}", commit="7449c49", code_version=8)
+
+RESUME_SETUP = '''
+# Checkpoints de la run interrompue (dataset privé @@CHECKPOINTS@@) copiés dans le dossier de la run ; contrôles
+# avant de relancer : fichiers intacts, configuration identique, LR et lambda déterminés par l'itération.
+import ast, math
+sys.path.insert(0, str(REPO))
+from adaptation.dann import ganin_lambda
+RUN = RUNS_DIR / "@@RUN@@"
+found = [path.parent for path in INPUT.rglob("last.pt") if (path.parent / "config.json").is_file()
+         and json.loads((path.parent / "config.json").read_text()).get("technique") == "@@TECHNIQUE@@"]
+if len(found) != 1:
+    raise FileNotFoundError(f"last.pt de la run @@TECHNIQUE@@ trouvé {len(found)} fois (1 attendu) : "
+                            "ajouter le dataset @@CHECKPOINTS@@ en entrée.")
+SOURCE = found[0]
+sums = SOURCE / "sha256.txt"
+if sums.is_file():
+    for line in sums.read_text().split("\\n"):
+        if line.strip():
+            expected, name = line.split()
+            assert digest(SOURCE / name) == expected, f"{name} altéré pendant le transfert (sha256 différent)"
+    print("sha256 vérifiés :", sums.read_text().split())
+RUN.mkdir(parents=True, exist_ok=True)
+for name in ("last.pt", "best.pt"):
+    if not (RUN / name).exists():
+        shutil.copy2(SOURCE / name, RUN / name)
+last = torch.load(RUN / "last.pt", map_location="cpu", weights_only=False)
+best = torch.load(RUN / "best.pt", map_location="cpu", weights_only=False)
+for label, checkpoint in (("last.pt", last), ("best.pt", best)):
+    assert all(torch.isfinite(v).all() for v in checkpoint["model"].values() if v.is_floating_point()), \\
+        f"{label} contient des poids non finis"
+STATE, SAVED = last["state"], last["reprise"] or {}
+CONFIG = json.loads(json.dumps(last["config"], default=str))  # tuples en listes, comme config.json
+IT, MAX = STATE["iteration"], CONFIG["max_iterations"]
+BUDGET = CONFIG["time_budget_hours"] * 3600
+print("last.pt :", {k: STATE[k] for k in ("iteration", "elapsed", "best_dice", "best_iteration")})
+print("best.pt :", {k: best["state"][k] for k in ("iteration", "best_dice", "best_iteration")})
+print(f"Reste {MAX - IT} itérations ({IT} faites sur {MAX}) ; workers sauvegardés {SAVED.get('num_workers')}, "
+      f"{len(SAVED.get('rng_lots', []))} états aléatoires, {SAVED.get('volumes_consommes')} volumes consommés")
+# Configuration de la run : celle de last.pt, à l'identique (seuls les chemins changent).
+WANTED = dict(technique="@@TECHNIQUE@@", fold=@@FOLD@@, seed=@@SEED@@, num_workers=4, max_iterations=40000,
+              validate_every=2000, log_every=100, amp=False, grad_clip=12.0, dann_weight=0.1, dann_gamma=5.0,
+              dann_start=0.05, volumes_per_batch=2, patches_per_volume=2, learning_rate=0.001)
+mismatch = {k: (CONFIG.get(k), v) for k, v in WANTED.items() if CONFIG.get(k) != v}
+assert not mismatch, f"last.pt ne vient pas de la run DANN v2 attendue : {mismatch}"
+assert IT < MAX, "last.pt est déjà à la dernière itération : rien à reprendre"
+assert SAVED.get("num_workers") == 4 and len(SAVED.get("rng_lots", [])) == 4, "états aléatoires des workers absents"
+assert SAVED.get("volumes_consommes") == IT * CONFIG["volumes_per_batch"], "position du sampler incohérente"
+# Meilleur modèle sur toute la run : best.pt d'avant la coupure, cohérent avec l'état de last.pt.
+if best["state"]["iteration"] <= IT:
+    assert best["state"]["best_iteration"] == STATE["best_iteration"], "best.pt ne correspond pas à last.pt"
+    assert math.isclose(best["state"]["best_dice"], STATE["best_dice"]), "best.pt ne correspond pas à last.pt"
+# Avancement : max(temps / budget, itération / max) ; il doit rester fixé par l'itération jusqu'à la fin.
+lr_at = lambda done: CONFIG["learning_rate"] * (1 - done / MAX) ** 0.9  # noqa: E731
+assert math.isclose(SAVED["lr"], lr_at(IT - 1), rel_tol=1e-9), \\
+    f"LR sauvegardé {SAVED['lr']:.6e} au lieu de {lr_at(IT - 1):.6e} : avancement fixé par le temps, reprise inexacte"
+hours_left = 2.0  # majorant large : ~4 000 itérations et 2 validations sur une T4
+assert (STATE["elapsed"] + hours_left * 3600) / BUDGET < IT / MAX, "le budget de temps fixerait le LR à la reprise"
+FIRST = (IT // 100 + 1) * 100  # première ligne de progression après la reprise
+EXPECTED = dict(iteration=IT, premiere_ligne=FIRST, lr=f"{lr_at(FIRST - 1):.2e}",
+                **{"lambda": round(ganin_lambda((FIRST - 1) / MAX, CONFIG["dann_gamma"], CONFIG["dann_start"]), 4)},
+                sampler_start=IT * CONFIG["volumes_per_batch"])
+print("Attendu à la reprise :", EXPECTED)
+# Journal des validations : lignes postérieures à last.pt retirées (elles seront refaites) ; original conservé.
+journal = SOURCE / "journal_entrainement.csv"
+if journal.is_file() and not (RUN / "journal_entrainement_avant_reprise.csv").exists():
+    shutil.copy2(journal, RUN / "journal_entrainement_avant_reprise.csv")
+    lines = journal.read_text().splitlines()
+    kept = [lines[0]] + [line for line in lines[1:] if line and int(line.split(",")[0]) <= IT]
+    (RUN / "journal_entrainement.csv").write_text("\\n".join(kept) + "\\n")
+    print(f"Journal : {len(kept) - 1} validations conservées, {len(lines) - len(kept)} refaites")
+'''
+
+RESUME_TRAIN = '''
+# Reprise avec --resume jusqu'à 40 000 itérations, validations toutes les 2 000, puis évaluation ID et OOD.
+# Arrêt immédiat si la reprise n'est pas exacte (itération, états aléatoires, configuration, LR ou lambda).
+# Journal complet dans runs/@@RUN@@/entrainement.log.
+checks = []
+def stop(process, message):
+    process.terminate()
+    raise RuntimeError("REPRISE INEXACTE : " + message)
+
+log_path = RUN / "entrainement.log"
+command = [sys.executable, "-u", "-m", "adaptation.train", "--technique", "@@TECHNIQUE@@", "--fold", "@@FOLD@@",
+           "--seed", "@@SEED@@", "--data-root", str(DATA), "--output", str(RUNS_DIR), "--num-workers", "4",
+           "--validate-every", "2000", "--log-every", "100", "--resume"]
+with open(log_path, "a", encoding="utf-8") as log:
+    process = subprocess.Popen(command, cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                               bufsize=1, encoding="utf-8", errors="replace",
+                               env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"})
+    for line in process.stdout:
+        print(line, end="", flush=True)
+        log.write(line)
+        log.flush()
+        if line.startswith("Reprise "):
+            if f"itération {IT} " not in line or "états aléatoires restaurés" not in line:
+                stop(process, line.strip())
+            config = json.loads((RUN / "config.json").read_text())
+            paths = ("data_root", "splits", "output")
+            diff = {k: (CONFIG.get(k), v) for k, v in config.items() if k not in paths and CONFIG.get(k) != v}
+            if diff:
+                stop(process, f"configuration différente de last.pt : {diff}")
+            checks.append(f"itération {IT}, sampler au volume {IT * 2}, 4 états de workers, configuration identique")
+        elif line.startswith("{'progression'") and len(checks) == 1:
+            first = ast.literal_eval(line.strip())
+            got = dict(premiere_ligne=first["progression"], lr=first["lr"], **{"lambda": first["lambda"]})
+            want = {k: EXPECTED[k] for k in got}
+            if got != want:
+                stop(process, f"première ligne {got} au lieu de {want}")
+            checks.append(f"première ligne {got} = attendu")
+            log.write(f"CONTRÔLE DE REPRISE : OK ({' ; '.join(checks)})\\n")
+            print("CONTRÔLE DE REPRISE : OK", checks, flush=True)
+    process.wait()
+if process.returncode:
+    raise RuntimeError(f"adaptation.train terminé avec le code {process.returncode} : voir {log_path}")
+assert len(checks) == 2, "contrôle de reprise incomplet : voir le journal"
+'''
+
+
+def resume_notebook(commit):
+    spec = RESUME
+    run = f"unet3d_{spec['technique']}_pli{FOLD}"
+    cells = [
+        markdown(f"""
+# RQ3 — DANN v2 : fin de l'entraînement après la coupure sur Colab
+
+Run `{run}` commencée sur Google Colab (code `{spec['commit']}`), coupée par la limite GPU de Colab avant 40 000
+itérations. Ce notebook reprend **exactement** depuis `last.pt` (`--resume` : itération, poids, optimiseur, position du
+sampler et états aléatoires des 4 workers), avec la même configuration, jusqu'à 40 000 itérations et les validations
+toutes les 2 000, puis évalue le meilleur modèle de **toute** la run (`best.pt` d'avant la coupure inclus) sur le test ID
+du pli {FOLD} et le test OOD, comme les autres runs.
+
+**Avant de lancer** : *GPU T4*, Internet activé, datasets privés `{DATASET}`, `{CODE_DATASET}` (version
+{spec['code_version']} = `{spec['commit']}`) et `{spec['checkpoints']}` (last.pt, best.pt, journal, config) en entrée.
+Durée estimée : 1 à 1 h 30. Avant l'entraînement, la reprise est contrôlée (fichiers, configuration, LR et lambda) ;
+pendant, la run s'arrête aussitôt si l'itération, les états aléatoires, le LR ou lambda de la première ligne diffèrent
+des valeurs attendues.
+"""),
+        *setup_cells(commit),
+        code(fill(RESUME_SETUP, RUN=run, TECHNIQUE=spec["technique"], CHECKPOINTS=spec["checkpoints"], FOLD=FOLD,
+                  SEED=SEED)),
+        code(fill(RESUME_TRAIN, RUN=run, TECHNIQUE=spec["technique"], FOLD=FOLD, SEED=SEED)),
+        code(fill(SUMMARY, RUN=run)),
+    ]
+    return {"cells": cells, "metadata": notebook_metadata(), "nbformat": 4, "nbformat_minor": 5}
+
+
+def resume_metadata():
+    metadata = kernel_metadata(RESUME["name"], RESUME["slug"], code_version=RESUME["code_version"])
+    metadata["dataset_sources"].append(f"{USERNAME}/{RESUME['checkpoints']}")
+    return metadata
+
+
 DIAG = ("06_diag_nan", "rq3-diag-nan")
 
 
@@ -477,7 +633,12 @@ def main():
     parser.add_argument("--commit", help="commit(s) accepté(s) dans VERSION.json, séparés par des virgules, par ordre "
                                           "de préférence (défaut : HEAD)")
     parser.add_argument("--code-version", type=int, help="kernels Kaggle : version du dataset de code à attacher")
+    parser.add_argument("--dann-resume", type=Path, help="dossier du kernel de reprise de DANN v2 (seul généré)")
     args = parser.parse_args()
+    if args.dann_resume:
+        write_kernel(args.dann_resume, RESUME["name"], resume_notebook(RESUME["commit"]), resume_metadata())
+        print(args.dann_resume, RESUME["slug"], "commit attendu", RESUME["commit"])
+        return
     for name, technique, title, duration in RUNS:
         write_notebook(HERE / f"{name}.ipynb", notebook(name, technique, title, duration))
     write_notebook(HERE / f"{CONTINUAL[0]}.ipynb", continual_notebook())
