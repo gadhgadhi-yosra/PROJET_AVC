@@ -12,8 +12,8 @@ Bootstrap : 10000 tirages, IC 95 % percentile. Wilcoxon apparié sur les sujets 
 
 ## Sources
 
-- Baseline : C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_id_test.csv, C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_ood_test.csv
-- Intensité : C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resultats_id_test.csv, C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resultats_ood_test.csv
-- FDA : C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resultats_id_test.csv, C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resultats_ood_test.csv
-- DANN : C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-dann-v2-reprise-pli0\runs\unet3d_dann_pli0\resultats_id_test.csv, C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-dann-v2-reprise-pli0\runs\unet3d_dann_pli0\resultats_ood_test.csv
-- Baseline + TENT : C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_id_test_tent.csv, C:\Users\Anas\Desktop\bureau\fayfa\tek-up_3\PROJET_AVC\data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_ood_test_tent.csv
+- Baseline : data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_id_test.csv, data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_ood_test.csv
+- Intensité : data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resultats_id_test.csv, data\kaggle_sorties\rq3-intensity-pli0\runs\unet3d_intensity_pli0\resultats_ood_test.csv
+- FDA : data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resultats_id_test.csv, data\kaggle_sorties\rq3-fda-pli0\runs\unet3d_fda_pli0\resultats_ood_test.csv
+- DANN : data\kaggle_sorties\rq3-dann-v2-reprise-pli0\runs\unet3d_dann_pli0\resultats_id_test.csv, data\kaggle_sorties\rq3-dann-v2-reprise-pli0\runs\unet3d_dann_pli0\resultats_ood_test.csv
+- Baseline + TENT : data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_id_test_tent.csv, data\kaggle_sorties\rq3-baseline-fp32-pli0\runs\unet3d_baseline_pli0\resultats_ood_test_tent.csv

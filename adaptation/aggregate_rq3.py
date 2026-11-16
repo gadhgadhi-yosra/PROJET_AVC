@@ -263,19 +263,36 @@ def figures(rows, table, centers, sizes, folder):
     ax.set_title("RQ3 - Dice ID et OOD par technique (pli 0)", color=INK, loc="left")
     paths.append(save(fig, folder / "rq3_dice_id_ood.png"))
 
-    # 2. Dice par centre (technique x centre), teinte séquentielle unique.
-    pivot = centers.assign(colonne=centers["split"].str.replace("_test", "").str.upper() + " " + centers["site"])
-    pivot = pivot.pivot_table(index="technique", columns="colonne", values="dice").reindex(order)
-    fig, ax = plt.subplots(figsize=(max(6, 0.75 * pivot.shape[1] + 2), 0.5 * len(order) + 1.5))
-    image = ax.imshow(pivot.to_numpy(dtype=float), cmap="Blues", vmin=0, vmax=1, aspect="auto")
-    ax.set_xticks(range(pivot.shape[1]), pivot.columns, rotation=45, ha="right")
-    ax.set_yticks(range(len(order)), labels)
-    for (i, j), value in np.ndenumerate(pivot.to_numpy(dtype=float)):
+    # 2. Dice par centre : un centre par ligne (test ID puis test OOD), une technique par colonne.
+    # Largeur 6,3 pouces (16 cm) : insérée à \linewidth dans le rapport, les textes gardent leur taille de 8 pt.
+    from matplotlib.colors import LinearSegmentedColormap
+    data = centers.assign(groupe=(centers["split"] == "ood_test").astype(int))
+    lines = (data.groupby(["groupe", "split", "site"])["n"].max().reset_index().sort_values(["groupe", "site"]))
+    grid = (data.pivot_table(index=["split", "site"], columns="technique", values="dice")
+            .reindex(list(zip(lines["split"], lines["site"]))).reindex(columns=order).to_numpy(dtype=float))
+    n_lines, n_id = len(lines), int((lines["groupe"] == 0).sum())
+    fig, ax = plt.subplots(figsize=(6.3, min(9.0, max(3.5, 0.165 * n_lines + 1.4))))
+    ramp = LinearSegmentedColormap.from_list("rq3", ["#f3f7fd", COLORS[0], "#0b2e63"])  # bleu de la palette
+    image = ax.imshow(grid, cmap=ramp, vmin=0, vmax=1, aspect="auto")
+    ax.set_xticks(range(len(order)), labels, fontsize=8)
+    ax.xaxis.tick_top()
+    ax.set_yticks(range(n_lines), [f"{site} (n = {n})" for site, n in zip(lines["site"], lines["n"])], fontsize=8)
+    ax.tick_params(length=0, colors=MUTED, labelcolor=INK)
+    for (i, j), value in np.ndenumerate(grid):
         if np.isfinite(value):
-            ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=7,
-                    color="white" if value > 0.6 else INK)
-    fig.colorbar(image, ax=ax, label="Dice moyen")
-    ax.set_title("Dice moyen par centre", color=INK, loc="left")
+            ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=8,
+                    color="white" if value > 0.55 else INK)
+    for start, stop, name in ((0, n_id, "Test ID"), (n_id, n_lines, "Test OOD")):
+        if stop > start:
+            ax.text(len(order) - 0.5 + 0.12, (start + stop - 1) / 2, name, rotation=270, ha="left", va="center",
+                    fontsize=8, color=MUTED)
+    if 0 < n_id < n_lines:
+        ax.axhline(n_id - 0.5, color=INK, linewidth=1.5)
+    ax.spines[:].set_visible(False)
+    bar = fig.colorbar(image, ax=ax, orientation="horizontal", fraction=0.02, pad=0.015, aspect=40)
+    bar.set_label("Dice moyen", fontsize=8, color=INK)
+    bar.ax.tick_params(labelsize=8, colors=MUTED, labelcolor=INK)
+    bar.outline.set_visible(False)
     paths.append(save(fig, folder / "rq3_dice_par_centre.png"))
 
     # 3. Dice OOD par classe de volume de lésion (une ligne par technique).

@@ -96,7 +96,7 @@ cd data\kaggle_projet_avc_code ; kaggle datasets version -p . -r skip -m "messag
 
 ```powershell
 uv tool install kaggle                                   # CLI Kaggle, isolé de .venv-dl
-# Jeton : kaggle.com > Settings > API > Create New Token, puis placer kaggle.json dans C:\Users\Anas\.kaggle\
+# Jeton : kaggle.com > Settings > API > Create New Token, puis placer kaggle.json dans %USERPROFILE%\.kaggle\
 cd data\kaggle_atlas_c1 ; kaggle datasets create -p . -r skip     # privé par défaut : ne jamais ajouter --public
 kaggle datasets status <identifiant-kaggle>/atlas-c1-processed
 ```
