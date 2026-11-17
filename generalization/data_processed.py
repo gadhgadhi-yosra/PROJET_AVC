@@ -1,4 +1,4 @@
-"""Chargeur des données prétraitées du contrat C1 (pipeline du pipeline).
+"""Chargeur des données prétraitées du contrat C1 (pipeline Spark S4).
 
     subjects = load_processed("data/processed", split="train", fold=0)   # liste de torchio.Subject
     subject = subjects[0]                                                 # clés : t1, mask, brain, site…

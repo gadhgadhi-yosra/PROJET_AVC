@@ -1,4 +1,4 @@
-# Démo locale — Pipeline
+# Démo locale — Projet AVC
 
 ## Lancement
 
