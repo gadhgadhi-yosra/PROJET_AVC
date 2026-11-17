@@ -60,7 +60,10 @@ class FrontendTest(unittest.TestCase):
         data = client.get('/api/contribution').json()
         self.assertEqual(data['weeks'][0]['weeks'], 'S1–S2')
         self.assertEqual(data['weeks'][-1]['weeks'], 'S13–S14')
-        self.assertEqual(data['tests'], 34)
+        from server import ROOT
+        import json
+        expected = json.loads((ROOT / 'integration/reports/verification.json').read_text())['pipeline_tests']['passed']
+        self.assertEqual(data['tests'], expected)
 
     def test_pages_and_files(self):
         self.assertIn('Projet AVC', client.get('/').text)
