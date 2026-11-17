@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-11",
+  "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1",
+  "archived_split": "docs/yosra/releases/splits_v1.json",
+  "cases": 1415,
+  "train_validation": 916,
+  "id_test": 231,
+  "ood_test": 268,
+  "quarantined": [
+    "R065_sub-r065s019_ses-1"
+  ],
+  "raw_data_modified": false,
+  "team_review_pending": true
+}

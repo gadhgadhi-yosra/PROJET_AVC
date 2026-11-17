@@ -32,12 +32,28 @@ from pipeline import inventory  # noqa: E402
 import week4  # noqa: E402
 
 
+def partition_quarantine(rows, policy_path):
+    """Applique la même quarantaine versionnée que le pipeline Spark de Yosra."""
+    policy = json.loads(Path(policy_path).read_text())
+    reasons = {item['case_id']: item['reason'] for item in policy['cases']}
+    active, excluded = [], []
+    for row in rows:
+        case = week4.case_id(row)
+        if case in reasons:
+            excluded.append(dict(row, case_id=case, status='excluded',
+                                 error='QC_quarantine: ' + reasons[case], seconds=0.0))
+        else:
+            active.append(row)
+    return active, excluded
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=REPO / "data" / "ATLAS3_Training_Raw")
     parser.add_argument("--output", type=Path, default=REPO / "data" / "processed")
     parser.add_argument("--cases", type=Path)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--exclusions", type=Path, default=REPO / "preprocessing/qc_exclusions.json")
     args = parser.parse_args()
 
     rows = inventory(args.root)
@@ -48,6 +64,7 @@ def main():
             raise ValueError("Sélection contenant des cas inconnus")
     if len({row["subject"] for row in rows}) != len(rows):
         raise ValueError("Plusieurs sessions par sujet")
+    rows, excluded = partition_quarantine(rows, args.exclusions)
     args.output.mkdir(parents=True, exist_ok=True)
     output = str(args.output.resolve())
     # Même règle que week4.spark_run : les volumes de plus de 40 M voxels passent un par un, à la fin.
@@ -67,9 +84,9 @@ def main():
     with ProcessPoolExecutor(1) as pool:
         results += list(pool.map(work, large, chunksize=1))
     seconds = time.perf_counter() - started
-    frame = pd.DataFrame(results)
+    frame = pd.DataFrame(results + excluded)
     frame.to_parquet(args.output / "subjects.parquet", index=False)
-    summary = dict(version=week4.VERSION, subjects=len(rows), sites=int(frame.site.nunique()),
+    summary = dict(version=week4.VERSION, subjects=len(frame), sites=int(frame.site.nunique()),
                    statuses=frame.status.value_counts().to_dict(), seconds=seconds, workers=args.workers,
                    orchestration="ProcessPoolExecutor (sans Spark)")
     week4.write_json(args.output / "summary.json", summary)

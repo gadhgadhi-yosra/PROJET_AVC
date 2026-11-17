@@ -1,0 +1,76 @@
+{
+  "protocol": "historical_baselines_00e2692",
+  "split_counts": {
+    "train": 903,
+    "ood_test": 287,
+    "id_val": 226
+  },
+  "split_sha256": "edff30ec42620563d2b1bcddcff055a080c82c52bb12fd778dcf56e9afcc4ff8",
+  "sources_sha256": {
+    "baselines/outputs/fast_results/cnn_pretrained_freeze-encoder_cases.csv": "109bdce034d564a84ad228d0110dd71e5add1d46bfb6c826eb6ca8ae958c07e7",
+    "baselines/outputs/fast_results/cnn_pretrained_freeze-none_cases.csv": "b11334dc2dc8169f811def28b7935476a1661b19616188e9aa297b2359a4fb77",
+    "baselines/outputs/fast_results/cnn_pretrained_freeze-partial_cases.csv": "bc3c480df431679cfc7faa5ce5a9304fe9e5a10d1d579e6cd21d3de18c211a1f",
+    "baselines/outputs/fast_results/cnn_random_init_cases.csv": "255637342c54893fe1bd54e6a51f92287c3d0ff8618113aa92e0653f0d679f79",
+    "baselines/outputs/fast_results/ml_gradient_boosting_cases.csv": "879678852cf06b44b8c1e71d1b5f52db7be1b058baf9edc09e794276523ee8d3",
+    "baselines/outputs/fast_results/ml_logistic_regression_cases.csv": "7c115f11f3ab9373722df02fc60c42f303a5573f2fec3c487ba2459ca6ccec61",
+    "baselines/outputs/fast_results/ml_random_forest_cases.csv": "0aed0eaf648df0762e51b75f861f1724b75417b2da59f8fcaeb6e55cf747715d"
+  },
+  "primary_model": "cnn_pretrained_freeze-none",
+  "temporal_by_role": {
+    "ID": {
+      "n": 167,
+      "centers": 31,
+      "r2": {
+        "null": 0.0,
+        "center": 0.35311109252820794,
+        "time": 0.04419606565223455,
+        "both": 0.3531571760962353
+      },
+      "incremental_r2_time": 4.608356802739928e-05,
+      "incremental_r2_center": 0.3089611104440008,
+      "coefficient_log1p_days": 0.0018740333025275557,
+      "total": 226,
+      "missing_or_invalid_delay": 58,
+      "missing_dice": 1,
+      "permutation_p_time_given_center": 0.911,
+      "permutations": 999,
+      "seed": 2026,
+      "volume_sensitivity": {
+        "incremental_r2_time_given_center_and_volume": 0.0007106431296795537,
+        "coefficient_log1p_days": 0.007364092404352932
+      }
+    },
+    "OOD": {
+      "n": 257,
+      "centers": 12,
+      "r2": {
+        "null": 0.0,
+        "center": 0.14956517332731356,
+        "time": 0.15814730690885237,
+        "both": 0.1876470575453527
+      },
+      "incremental_r2_time": 0.0380818842180391,
+      "incremental_r2_center": 0.02949975063650028,
+      "coefficient_log1p_days": 0.07403047016591234,
+      "total": 287,
+      "missing_or_invalid_delay": 30,
+      "missing_dice": 0,
+      "permutation_p_time_given_center": 0.001,
+      "permutations": 999,
+      "seed": 2026,
+      "volume_sensitivity": {
+        "incremental_r2_time_given_center_and_volume": 0.0002171888458477889,
+        "coefficient_log1p_days": 0.00581133158499187
+      }
+    }
+  },
+  "scope": "Association exploratoire sur scores fournis ; aucune nouvelle inférence. Pas C1 v2.",
+  "limitations": [
+    "ID est la validation historique ayant participé au choix du modèle.",
+    "Analyses ID/OOD séparées, cas complets ; les Dice manquants ne sont pas imputés.",
+    "Le cas à masque vide r065s002 a un Dice absent dans tous les CSV : compté dans les données manquantes, exclu des ajustements.",
+    "P-values exploratoires non corrigées pour les deux groupes ; pas de conclusion causale.",
+    "Prétraitement et partition historiques distincts de C1 v2.",
+    "La sensibilité au volume ne supprime pas tous les facteurs de confusion."
+  ]
+}

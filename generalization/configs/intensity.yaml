@@ -5,11 +5,11 @@
 transforms:
   - name: gamma
     p: 0.3
-    gamma: [0.68, 1.79]       # position de la médiane sur [0, p99] : 0,41 (R030) à 0,71 (R040), médiane 0,604
+    gamma: [0.68, 1.79]
 
   - name: contrast
     p: 0.3
-    factor: [0.77, 1.53]      # coefficient de variation 0,31 (R020) à 0,62 (R030), rapporté à sa médiane 0,406
+    factor: [0.77, 1.53]
 
   - name: noise
     p: 0.2

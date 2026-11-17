@@ -159,6 +159,7 @@ def main():
     parser.add_argument('--reports', type=Path, default=ROOT / 'analysis/reports')
     parser.add_argument('--figures', type=Path, default=ROOT / 'figures')
     parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--reuse-measures', action='store_true', help='Réutiliser les mesures complètes si leurs volumes sont inchangés depuis le Parquet')
     args = parser.parse_args()
     args.reports.mkdir(parents=True, exist_ok=True)
     args.figures.mkdir(parents=True, exist_ok=True)
@@ -166,15 +167,26 @@ def main():
     subjects = pd.read_parquet(args.processed / 'subjects.parquet')
     done = subjects[subjects.status == 'ok']
     rows = done[['case_id', 'subject', 'site', 'output_dir']].to_dict('records')
-    results, seconds = spark_measures(rows, args.workers)
-    measures = pd.DataFrame(results)
-    failed = measures[measures.error != '']
-    measures = measures[measures.error == ''].drop(columns='error')
-    # Subject-level histograms stay next to the private processed data.
-    measures.to_parquet(args.processed / 'post_stats.parquet', index=False)
+    cache = args.processed / 'post_stats.parquet'
+    if args.reuse_measures:
+        measures = pd.read_parquet(cache)
+        if measures.case_id.duplicated().any() or set(measures.case_id) != set(done.case_id):
+            raise ValueError('Mesures incomplètes ou incohérentes avec les sorties courantes')
+        for row in rows:
+            for filename in ('t1.nii.gz', 'brain.nii.gz', 'qc.json'):
+                if (Path(row['output_dir'])/filename).stat().st_mtime_ns > cache.stat().st_mtime_ns:
+                    raise ValueError('Volumes modifiés depuis les mesures : relancer sans --reuse-measures')
+        failed = pd.DataFrame(); seconds = 0.0
+    else:
+        results, seconds = spark_measures(rows, args.workers)
+        measures = pd.DataFrame(results)
+        failed = measures[measures.error != '']
+        measures = measures[measures.error == ''].drop(columns='error')
+        # Subject-level histograms stay next to the private processed data.
+        measures.to_parquet(cache, index=False)
 
     before = pd.read_parquet(args.qc)
-    before = before[before.status == 'ok']
+    before = before[(before.status == 'ok') & before.case_id.isin(measures.case_id)]
     joined = measures.drop(columns='hist').merge(
         done[['case_id', 'raw_mean', 'raw_std', 'brain_ml', 'lesion_ml']], on='case_id')
     splits = json.loads(args.splits.read_text())
@@ -190,7 +202,7 @@ def main():
     stable = distances[distances.n >= MIN_SCANS]
     summary = dict(
         date=time.strftime('%Y-%m-%d'), subjects=len(measures), sites=int(measures.site.nunique()),
-        read_errors=len(failed), seconds=seconds,
+        read_errors=len(failed), seconds=seconds, measurements_reused=args.reuse_measures,
         subjects_not_processed=done.shape[0] - len(measures) + int((subjects.status == 'error').sum()),
         eta_squared={c: eta_squared(joined, c) for c in ('raw_mean', 'log_raw_mean', 'log_raw_std', 'z_p1', 'z_median', 'z_p99', 'z_skew')},
         raw_mean_site_range=[float(sites.raw_mean.min()), float(sites.raw_mean.max())],

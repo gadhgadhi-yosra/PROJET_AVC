@@ -1,0 +1,10 @@
+{
+  "subjects": 1415,
+  "valid_delay": 1073,
+  "missing_or_invalid": 342,
+  "centers": 54,
+  "centers_without_delay": 8,
+  "median_days": 365.0,
+  "eta_squared_log_delay_by_center": 0.7475106953103601,
+  "interpretation": "Description des métadonnées ; aucune relation avec le Dice mesurée. CHRONICITY ne définit pas un stade."
+}

@@ -1,0 +1,46 @@
+{
+  "splits": "splits.json",
+  "instructions": "Remplacer MODELE_C1 par le nom exact du modèle du CSV. Déclarer uniquement les plis réellement évalués. Le hash doit provenir du split utilisé pour entraîner et évaluer le modèle, pas être changé pour contourner le contrôle.",
+  "experiments": [
+    {
+      "id": "baseline_fold_0",
+      "model": "MODELE_C1",
+      "technique": "baseline",
+      "fold": 0,
+      "results": "data/predictions/c1_v2/results.csv",
+      "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1"
+    },
+    {
+      "id": "baseline_fold_1",
+      "model": "MODELE_C1",
+      "technique": "baseline",
+      "fold": 1,
+      "results": "data/predictions/c1_v2/results.csv",
+      "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1"
+    },
+    {
+      "id": "baseline_fold_2",
+      "model": "MODELE_C1",
+      "technique": "baseline",
+      "fold": 2,
+      "results": "data/predictions/c1_v2/results.csv",
+      "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1"
+    },
+    {
+      "id": "baseline_fold_3",
+      "model": "MODELE_C1",
+      "technique": "baseline",
+      "fold": 3,
+      "results": "data/predictions/c1_v2/results.csv",
+      "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1"
+    },
+    {
+      "id": "baseline_fold_4",
+      "model": "MODELE_C1",
+      "technique": "baseline",
+      "fold": 4,
+      "results": "data/predictions/c1_v2/results.csv",
+      "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1"
+    }
+  ]
+}

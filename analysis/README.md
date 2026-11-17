@@ -23,7 +23,7 @@ d = center_distance(scans, histogrammes_reference, metric='mmd')    # MMD
 
 ## Limites
 
-- Résultats sur 1 402 sujets : 14 sujets `lesion_outside_image_based_crop` restent à traiter (S4). À relancer ensuite.
+- Relance du 11 novembre sur 1 415 sujets : un cas `lesion_outside_image_based_crop` reste à examiner (S4). À relancer après résolution du QC.
 - Le z-score fixe la moyenne et l'écart-type de chaque scan : la distance mesure surtout la forme de l'histogramme restante.
 - `relative_before`/`relative_after` ne sont qu'un ordre de grandeur : les histogrammes « avant » viennent du QC (32 classes, normalisés par p99), ceux d'« après » du z-score (150 classes).
 - Les centres OOD ont été choisis avec une distance proche ; l'écart ID/OOD est donc en partie dû à cette sélection. Aucune relation avec le Dice n'est établie avant S7.
@@ -37,4 +37,39 @@ d = center_distance(scans, histogrammes_reference, metric='mmd')    # MMD
 
 À lancer après `run_analysis.sh`. Sorties : `analysis/reports/site_fingerprint_s6*`, `figures/s6_empreinte_centre.png`. Protocole du script 03 : centres d'au moins 20 sujets, 5 plis stratifiés, exactitude équilibrée, contrôle à étiquettes mélangées.
 
-Limites : l'empreinte mesure ce qu'un classifieur simple retrouve dans des histogrammes, pas ce qu'utilise un réseau (voir S8 et « après DANN »). Les plis mélangent les sujets d'un même centre : c'est voulu, car on cherche à reconnaître le centre. Résultats sur 1 130 scans, hors R032 et hors sujets non traités ; à relancer après correction des 14 sujets.
+Limites : l'empreinte mesure ce qu'un classifieur simple retrouve dans des histogrammes, pas ce qu'utilise un réseau (voir S8 et « après DANN »). Les plis mélangent les sujets d'un même centre : c'est voulu, car on cherche à reconnaître le centre. Relance sur 1 140 scans de 25 centres, hors R032 et hors sujet non traité ; à relancer après résolution du dernier cas.
+
+## Recalcul des agrégats sans relire toutes les IRM
+
+`analysis/post_stats.py --reuse-measures` réutilise le Parquet complet uniquement si les
+identifiants correspondent aux sorties OK et si aucun T1, masque cérébral ou marqueur QC
+n'a été modifié depuis sa création. Le résumé indique `measurements_reused=true` et
+`seconds=0` : ce zéro signifie absence de nouvelle passe Spark, pas un benchmark nul.
+La MMD utilise maintenant une matrice de distances sans temporaire n × m × 150, ce qui
+réduit la mémoire. Cette optimisation ne change pas la définition de la distance.
+
+## S7–S10
+
+Voir [les commandes et contrats](ANALYSES_S7_S10.md) pour la prédiction d'échec, le délai,
+les caractéristiques du réseau, l'empreinte après DANN et l'alerte individuelle de la démo.
+
+## S6 : intervalles conditionnels et comparaison appariée
+
+```sh
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv-spark/bin/python analysis/site_fingerprint_uncertainty.py
+```
+
+[Résultats et limites](reports/s6_uncertainty/README.md) : lot réservé de 228 sujets,
+10 000 rééchantillonnages appariés stratifiés par centre. Les intervalles portent sur
+les modèles fixés ; ils ne remplacent pas les écarts-types des cinq plis du rapport initial.
+
+## Synthèse QC par centre
+
+```sh
+.venv-spark/bin/python analysis/qc_by_center.py
+```
+
+[Tableau et définitions](reports/qc_by_center/README.md), CSV détaillé et figure
+`reports/qc_by_center/qc_by_center.png`. Les statuts couvrent l’inventaire entier ;
+les indicateurs de masques et de métadonnées ne portent que sur les sujets retenus.
+Aucune donnée source ni décision QC n’est modifiée.

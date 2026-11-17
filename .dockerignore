@@ -1,0 +1,9 @@
+.git
+.venv*
+.tools
+data
+artifacts
+**/__pycache__
+**/*.nii.gz
+**/*.pth
+**/*.pt

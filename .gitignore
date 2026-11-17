@@ -1,6 +1,11 @@
 .venv/
 .venv-spark/
 .venv-dl/
+.venv-demo/
+data/features/
+data/predictions/
+data/demo/
+demo/vendor/
 data/raw/
 .ipynb_checkpoints/
 
@@ -36,3 +41,7 @@ data/nnUNet_raw/
 figures/rq3/rq3_echecs_coupes_*.png
 # Checkpoints des modèles (récupérés depuis Kaggle, trop lourds pour Git)
 data/modeles/
+.venv-integration/
+
+# Résultats individuels des analyses finales
+data/analysis/

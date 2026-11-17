@@ -94,6 +94,17 @@ class Week4Tests(unittest.TestCase):
         self.save(x,np.zeros_like(x))
         self.assertIn('nonfinite',work(self.row,self.p,qc_only=True)['error'])
 
+    def test_n4_preserves_geometry_and_changes_cache_signature(self):
+        baseline=transform(self.row,self.p,margin=2)
+        reference=nib.load(self.p/'sub-1/mask.nii.gz')
+        expected=reference.get_fdata().copy();affine=reference.affine.copy()
+        corrected=transform(self.row,self.p,margin=2,n4=True)
+        result=nib.load(self.p/'sub-1/mask.nii.gz')
+        self.assertTrue(corrected['n4'])
+        self.assertNotEqual(baseline['signature'],corrected['signature'])
+        np.testing.assert_array_equal(result.get_fdata(),expected)
+        np.testing.assert_allclose(result.affine,affine)
+
 
 class SplitTests(unittest.TestCase):
     def frame(self):
@@ -125,5 +136,9 @@ class SplitTests(unittest.TestCase):
             self.assertEqual(len(list((out/'imagesTs').glob('*'))),len(s['id_test'])+len(s['ood_test']))
             self.assertFalse((out/'labelsTr'/f"{s['ood_test'][0]}.nii.gz").exists())
             self.assertEqual(json.loads((out/'dataset.json').read_text())['numTraining'],len(s['train']))
+            marker=processed/s['cases'][0]['subject']/'qc.json'
+            marker.write_text(json.dumps(dict(version=VERSION,n4=True)))
+            with self.assertRaisesRegex(ValueError,'N4/non-N4'):
+                export_dataset(s,processed,root/'mixed')
 
 if __name__=='__main__':unittest.main()

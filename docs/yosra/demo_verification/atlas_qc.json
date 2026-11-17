@@ -1,0 +1,7 @@
+{
+  "same_grid": true,
+  "integer_labels": true,
+  "labels_inside_image_support_fraction": 0.9775358055096321,
+  "status": "technical_checks_passed; anatomical_review_required",
+  "template_atlas": "HarvardOxford / MNI152NLin6Asym"
+}
