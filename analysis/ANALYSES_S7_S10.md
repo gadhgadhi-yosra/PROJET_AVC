@@ -1,4 +1,4 @@
-# Analyses de Yosra — S7 à S10
+# Analyses du pipeline — S7 à S10
 
 Toutes les commandes partent de la racine et utilisent `.venv-spark/bin/python`.
 Fixer modèle, technique et pli dans chaque expérience. Les outils refusent les

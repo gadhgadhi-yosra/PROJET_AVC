@@ -69,6 +69,6 @@ Ces tests vérifient la mécanique, pas l'efficacité : un réseau non entraîn�
 
 1. **Brancher DANN** : envelopper le réseau de la boucle dans `DANNWrapper`, passer le centre de chaque sujet (clé `site` de `load_processed`) et appeler `set_progress` à chaque époque. Le classifieur ne doit connaître que les centres d'entraînement du pli.
 2. **Normalisations affines** dans le réseau, pour TENT.
-3. **Entraînements avec et sans DANN** sur les mêmes plis, pour le tableau d'ablation RQ3, puis les modèles « avant / après DANN » pour le test d'empreinte de Yosra (§5.5).
+3. **Entraînements avec et sans DANN** sur les mêmes plis, pour le tableau d'ablation RQ3, puis les modèles « avant / après DANN » pour le test d'empreinte du pipeline (§5.5).
 4. **TENT sur les centres OOD** : un `Tent` par centre arrivant, `reset()` entre deux centres pour la stratégie « TENT seul » de l'adaptation continue (§5.1).
 5. **Réglages** (λ maximal, γ de Ganin, taux d'apprentissage et nombre de pas de TENT) : sur la validation des plis seulement, jamais sur le test OOD.

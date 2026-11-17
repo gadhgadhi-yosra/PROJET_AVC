@@ -1,6 +1,6 @@
 """Pilote local du prétraitement C1 sans Spark, pour Windows (Spark y exige winutils.exe).
 
-Appelle tels quels `pipeline.inventory` et `week4.work` de preprocessing/ (code de Yosra, non
+Appelle tels quels `pipeline.inventory` et `week4.work` de preprocessing/ (code du pipeline, non
 modifié) ; seule la répartition change : des processus Python remplacent `spark_run`, avec la même
 règle (volumes de plus de 40 M voxels traités un par un, à la fin). Écrit `<output>/subjects.parquet`
 et `<output>/summary.json` comme `week4.run`. Reprise automatique des sujets déjà traités.
@@ -33,7 +33,7 @@ import week4  # noqa: E402
 
 
 def partition_quarantine(rows, policy_path):
-    """Applique la même quarantaine versionnée que le pipeline Spark de Yosra."""
+    """Applique la même quarantaine versionnée que le pipeline Spark du pipeline."""
     policy = json.loads(Path(policy_path).read_text())
     reasons = {item['case_id']: item['reason'] for item in policy['cases']}
     active, excluded = [], []
