@@ -39,6 +39,14 @@ fda,ood_test,< 1 ml,0.3040782227977306,41
 fda,ood_test,1-10 ml,0.4566409524921371,86
 fda,ood_test,10-50 ml,0.6624943459787573,80
 fda,ood_test,>= 50 ml,0.7481200755441565,58
+histogram_matching,id_test,< 1 ml,0.48781131628129754,34
+histogram_matching,id_test,1-10 ml,0.5761664274461546,65
+histogram_matching,id_test,10-50 ml,0.7097344302420089,48
+histogram_matching,id_test,>= 50 ml,0.8279081797906711,38
+histogram_matching,ood_test,< 1 ml,0.32759871929950507,41
+histogram_matching,ood_test,1-10 ml,0.48654548032263856,86
+histogram_matching,ood_test,10-50 ml,0.6581058130831342,80
+histogram_matching,ood_test,>= 50 ml,0.7425851326350421,58
 intensity,id_test,< 1 ml,0.4620589091529083,34
 intensity,id_test,1-10 ml,0.5936958015941677,65
 intensity,id_test,10-50 ml,0.7400769833394333,48

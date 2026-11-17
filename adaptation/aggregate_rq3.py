@@ -34,8 +34,9 @@ BASELINE = "baseline"
 ORDER = ["baseline", "intensity", "bigaug", "fda", "histogram_matching", "dann", "baseline+tent"]
 LABELS = {"baseline": "Baseline", "intensity": "Intensité", "bigaug": "BigAug", "fda": "FDA",
           "histogram_matching": "Histogram matching", "dann": "DANN", "baseline+tent": "Baseline + TENT"}
+SHORT_LABELS = {"histogram_matching": "HM", "baseline+tent": "Baseline\n+ TENT"}
 # Comparaisons directes A - B entre techniques candidates au modèle final, hors correction de Holm.
-COMPARISONS = [("bigaug", "intensity")]
+COMPARISONS = [("bigaug", "intensity"), ("histogram_matching", "intensity")]
 SIZE_BINS = [0, 1, 10, 50, math.inf]  # ml
 SIZE_LABELS = ["< 1 ml", "1-10 ml", "10-50 ml", ">= 50 ml"]
 RESULT_FILE = re.compile(r"(^|/)resultats_(id_test|ood_test)(_tent)?\.csv$")
@@ -289,7 +290,8 @@ def figures(rows, table, centers, sizes, folder):
     fig, ax = plt.subplots(figsize=(6.3, min(9.0, max(3.5, 0.165 * n_lines + 1.4))))
     ramp = LinearSegmentedColormap.from_list("rq3", ["#f3f7fd", COLORS[0], "#0b2e63"])  # bleu de la palette
     image = ax.imshow(grid, cmap=ramp, vmin=0, vmax=1, aspect="auto")
-    ax.set_xticks(range(len(order)), labels, fontsize=8)
+    # Étiquettes courtes (comme dans les tableaux du rapport) : sept colonnes sur 16 cm sans chevauchement.
+    ax.set_xticks(range(len(order)), [SHORT_LABELS.get(t, LABELS.get(t, t)) for t in order], fontsize=8)
     ax.xaxis.tick_top()
     ax.set_yticks(range(n_lines), [f"{site} (n = {n})" for site, n in zip(lines["site"], lines["n"])], fontsize=8)
     ax.tick_params(length=0, colors=MUTED, labelcolor=INK)

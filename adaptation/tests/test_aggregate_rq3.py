@@ -90,12 +90,15 @@ def test_sans_resultats(tmp_path):
 def test_comparaison_directe(outputs):
     with pytest.warns(UserWarning, match="lignes en double"):
         result = aggregate([outputs / "sorties"], outputs / "agregation", outputs / "figures", n_boot=500)
-    overall = result["comparisons"].set_index("split")
-    ood = overall.loc["ood_test"]
-    assert (ood.a, ood.b, ood.n) == ("bigaug", "intensity", 39)
+    overall = result["comparisons"].set_index(["a", "split"])
+    ood = overall.loc[("bigaug", "ood_test")]
+    assert (ood.b, ood.n) == ("intensity", 39)
     assert ood.delta == pytest.approx(0.08, abs=0.01) and ood.ic_bas > 0 and ood.p_wilcoxon < 0.01
+    hm = overall.loc[("histogram_matching", "ood_test")]
+    assert hm.delta == pytest.approx(-0.07, abs=0.01) and hm.ic_haut < 0
     by_center = result["comparisons_by_center"]
-    assert set(by_center["site"]) == set(SITES_OOD) and by_center["n"].sum() == 39
+    bigaug = by_center[by_center["a"] == "bigaug"]
+    assert set(bigaug["site"]) == set(SITES_OOD) and bigaug["n"].sum() == 39
     text = (outputs / "agregation" / "tableau_rq3.md").read_text(encoding="utf-8")
     assert "Comparaisons directes" in text and (outputs / "agregation" / "comparaisons_par_centre.csv").is_file()
 
