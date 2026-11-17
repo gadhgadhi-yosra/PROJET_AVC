@@ -29,7 +29,7 @@ def revise_split(original, exclusions):
 
 
 def main():
-    source=ROOT/'splits.json';archive=ROOT/'docs/yosra/releases/splits_v1.json'
+    source=ROOT/'splits.json';archive=ROOT/'docs/pipeline/releases/splits_v1.json'
     original=json.loads(source.read_text())
     policy=json.loads((ROOT/'preprocessing/qc_exclusions.json').read_text())
     exclusions={c['case_id']:c['reason'] for c in policy['cases']}
