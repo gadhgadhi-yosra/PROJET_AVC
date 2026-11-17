@@ -24,3 +24,15 @@ artifacts/
 
 # Généralisation : figures et mesures de visual_check.py (coupes de patients, à régénérer en local)
 generalization/figures/
+
+# Private week 4 outputs, QC and nnU-Net data
+data/processed/
+data/qc_s4/
+data/validation_s4/
+data/benchmark_s4/
+data/nnUNet_raw/
+
+# Coupes de patients produites par adaptation/analyse_echecs.py (données ATLAS, à régénérer en local)
+figures/rq3/rq3_echecs_coupes_*.png
+# Checkpoints des modèles (récupérés depuis Kaggle, trop lourds pour Git)
+data/modeles/

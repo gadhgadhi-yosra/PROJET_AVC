@@ -24,10 +24,10 @@ transforms:
 
   - name: gamma
     p: 0.5
-    # 0,5 à 4,5 dans l'article. Sur données réelles, un gamma de 2,5 met déjà 10 à 22 % du cerveau
-    # au noir (82 % à 4,5 pour R008) et 0,5 divise par deux le contraste des lésions peu visibles :
-    # on garde la plage calibrée de intensity.yaml.
-    gamma: [0.7, 1.85]
+    # 0,5 à 4,5 dans l'article. Sur les sujets d'entraînement (données C1), un gamma de 2,5 met déjà
+    # 9 à 13 % du cerveau au noir (48 % à R030) et 0,5 divise par deux le contraste des lésions :
+    # on garde la plage calibrée de intensity.yaml (calibration.json).
+    gamma: [0.68, 1.79]
 
   - name: affine
     p: 0.5

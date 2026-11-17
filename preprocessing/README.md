@@ -50,3 +50,7 @@ Dans `data/preprocessing_s3/` (ignoré par Git) :
 Les tables sont remplacées à chaque lancement dans le même dossier ; les volumes précédents restent présents. Utiliser une sortie distincte pour chaque essai. Le centre R032 est exclu provisoirement à cause de l’espacement suspect identifié pendant l’exploration. Les métadonnées vides sont signalées et ne bloquent pas une paire d’images valide.
 
 Un contrôle d’espace estime la taille des sorties compressées (2 × la taille des fichiers d’entrée, ajustée au nombre de voxels) et conserve 2 Gio de marge : environ 10,5 Gio pour le lot complet. Les données brutes restent intactes.
+
+## Suite : semaine 4
+
+Normalisation, recadrage, contrôle qualité complet, partitions par centre, export nnU-Net et benchmark : voir [SEMAINE4.md](SEMAINE4.md). Les sorties S3 sont conservées.

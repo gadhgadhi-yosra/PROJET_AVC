@@ -1,0 +1,19 @@
+{
+  "version": "s4-v1",
+  "subjects": 1453,
+  "sites": 55,
+  "statuses": {
+    "ok": 1416,
+    "excluded": 37
+  },
+  "seconds": 1351.4961105760012,
+  "qc_only": true,
+  "workers": 2,
+  "metadata_warnings": 2,
+  "empty_masks": 5,
+  "invalid_days": 1,
+  "read_errors": 0,
+  "negative_masks_policy": "retained",
+  "exclusion_reason": "R032 unreliable spacing",
+  "date": "2026-10-25"
+}
