@@ -15,6 +15,14 @@ baseline+tent,ood_test,< 1 ml,0.3248908854896065,41
 baseline+tent,ood_test,1-10 ml,0.4572188503311569,86
 baseline+tent,ood_test,10-50 ml,0.6209336536325748,80
 baseline+tent,ood_test,>= 50 ml,0.7108259442829145,58
+bigaug,id_test,< 1 ml,0.4299820157043766,34
+bigaug,id_test,1-10 ml,0.5945622169193421,65
+bigaug,id_test,10-50 ml,0.7470929716931338,48
+bigaug,id_test,>= 50 ml,0.8330445974481357,38
+bigaug,ood_test,< 1 ml,0.3176777668596352,41
+bigaug,ood_test,1-10 ml,0.4816259810227491,86
+bigaug,ood_test,10-50 ml,0.6771113723376273,80
+bigaug,ood_test,>= 50 ml,0.7656371535676665,58
 dann,id_test,< 1 ml,0.4646021508556452,34
 dann,id_test,1-10 ml,0.5849640892094975,65
 dann,id_test,10-50 ml,0.7318501034159025,48

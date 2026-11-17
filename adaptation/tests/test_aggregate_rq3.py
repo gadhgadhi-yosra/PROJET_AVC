@@ -85,3 +85,26 @@ def test_statistiques():
 def test_sans_resultats(tmp_path):
     with pytest.raises(SystemExit, match="Aucun fichier"):
         aggregate([tmp_path], tmp_path / "out", tmp_path / "fig")
+
+
+def test_comparaison_directe(outputs):
+    with pytest.warns(UserWarning, match="lignes en double"):
+        result = aggregate([outputs / "sorties"], outputs / "agregation", outputs / "figures", n_boot=500)
+    overall = result["comparisons"].set_index("split")
+    ood = overall.loc["ood_test"]
+    assert (ood.a, ood.b, ood.n) == ("bigaug", "intensity", 39)
+    assert ood.delta == pytest.approx(0.08, abs=0.01) and ood.ic_bas > 0 and ood.p_wilcoxon < 0.01
+    by_center = result["comparisons_by_center"]
+    assert set(by_center["site"]) == set(SITES_OOD) and by_center["n"].sum() == 39
+    text = (outputs / "agregation" / "tableau_rq3.md").read_text(encoding="utf-8")
+    assert "Comparaisons directes" in text and (outputs / "agregation" / "comparaisons_par_centre.csv").is_file()
+
+
+def test_ic_independants_des_autres_runs(outputs, tmp_path):
+    """Les IC d'une technique ne changent pas quand d'autres runs s'ajoutent (ordre des sujets fixe)."""
+    baseline = outputs / "sorties" / "fayfa" / "rq3-baseline-pli0"
+    alone = aggregate([baseline], tmp_path / "a", tmp_path / "fig_a", n_boot=300)["table"].set_index("technique").loc["baseline"]
+    others = [baseline, outputs / "sorties" / "yosra", outputs / "sorties" / "anas"]
+    with_others = aggregate(others, tmp_path / "b", tmp_path / "fig_b", n_boot=300)["table"].set_index("technique").loc["baseline"]
+    for key in ("dice_id_ic_bas", "dice_id_ic_haut", "dice_ood_ic_bas", "dice_ood_ic_haut", "ecart_ic_bas"):
+        assert alone[key] == with_others[key], key

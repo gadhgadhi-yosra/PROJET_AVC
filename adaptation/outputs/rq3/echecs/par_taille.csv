@@ -1,26 +1,31 @@
 split,taille,technique,dice,n
 id_test,< 1 ml,baseline,0.4822423193407978,34
 id_test,< 1 ml,baseline+tent,0.4832326772498181,34
+id_test,< 1 ml,bigaug,0.4299820157043766,34
 id_test,< 1 ml,dann,0.4646021508556452,34
 id_test,< 1 ml,fda,0.4432428890058927,34
 id_test,< 1 ml,intensity,0.4620589091529083,34
 id_test,1-10 ml,baseline,0.5818113217652823,65
 id_test,1-10 ml,baseline+tent,0.5814310736039677,65
+id_test,1-10 ml,bigaug,0.5945622169193421,65
 id_test,1-10 ml,dann,0.5849640892094975,65
 id_test,1-10 ml,fda,0.6085180986218972,65
 id_test,1-10 ml,intensity,0.5936958015941677,65
 id_test,10-50 ml,baseline,0.7070772391162738,48
 id_test,10-50 ml,baseline+tent,0.7055988124216727,48
+id_test,10-50 ml,bigaug,0.7470929716931338,48
 id_test,10-50 ml,dann,0.7318501034159025,48
 id_test,10-50 ml,fda,0.7432975120604383,48
 id_test,10-50 ml,intensity,0.7400769833394333,48
 id_test,>= 50 ml,baseline,0.8254187593940607,38
 id_test,>= 50 ml,baseline+tent,0.8234974071682233,38
+id_test,>= 50 ml,bigaug,0.8330445974481357,38
 id_test,>= 50 ml,dann,0.8258180225288093,38
 id_test,>= 50 ml,fda,0.8376331253642162,38
 id_test,>= 50 ml,intensity,0.8307588078245359,38
 ood_test,< 1 ml,baseline,0.3122519945805419,41
 ood_test,< 1 ml,baseline+tent,0.3248908854896065,41
+ood_test,< 1 ml,bigaug,0.3176777668596352,41
 ood_test,< 1 ml,continue_auto_apprentissage,0.3771091787514541,23
 ood_test,< 1 ml,continue_controlee,0.34978907430965966,23
 ood_test,< 1 ml,continue_fige,0.3518136714160573,23
@@ -30,6 +35,7 @@ ood_test,< 1 ml,fda,0.3040782227977306,41
 ood_test,< 1 ml,intensity,0.32792428981203725,41
 ood_test,1-10 ml,baseline,0.45991715486098456,86
 ood_test,1-10 ml,baseline+tent,0.4572188503311569,86
+ood_test,1-10 ml,bigaug,0.4816259810227491,86
 ood_test,1-10 ml,continue_auto_apprentissage,0.4442899374833529,41
 ood_test,1-10 ml,continue_controlee,0.4804065299746331,41
 ood_test,1-10 ml,continue_fige,0.48007311009904585,41
@@ -39,6 +45,7 @@ ood_test,1-10 ml,fda,0.4566409524921371,86
 ood_test,1-10 ml,intensity,0.49913532533617366,86
 ood_test,10-50 ml,baseline,0.6431431235043193,80
 ood_test,10-50 ml,baseline+tent,0.6209336536325748,80
+ood_test,10-50 ml,bigaug,0.6771113723376273,80
 ood_test,10-50 ml,continue_auto_apprentissage,0.5231331319063094,30
 ood_test,10-50 ml,continue_controlee,0.6049931752027007,30
 ood_test,10-50 ml,continue_fige,0.6059270165528157,30
@@ -48,6 +55,7 @@ ood_test,10-50 ml,fda,0.6624943459787573,80
 ood_test,10-50 ml,intensity,0.6685179680346738,80
 ood_test,>= 50 ml,baseline,0.7362219708206118,58
 ood_test,>= 50 ml,baseline+tent,0.7108259442829145,58
+ood_test,>= 50 ml,bigaug,0.7656371535676665,58
 ood_test,>= 50 ml,continue_auto_apprentissage,0.7255064356164665,13
 ood_test,>= 50 ml,continue_controlee,0.8094705036334706,13
 ood_test,>= 50 ml,continue_fige,0.8112577982020667,13

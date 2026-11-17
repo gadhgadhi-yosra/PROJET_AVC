@@ -34,6 +34,8 @@ BASELINE = "baseline"
 ORDER = ["baseline", "intensity", "bigaug", "fda", "histogram_matching", "dann", "baseline+tent"]
 LABELS = {"baseline": "Baseline", "intensity": "Intensité", "bigaug": "BigAug", "fda": "FDA",
           "histogram_matching": "Histogram matching", "dann": "DANN", "baseline+tent": "Baseline + TENT"}
+# Comparaisons directes A - B entre techniques candidates au modèle final, hors correction de Holm.
+COMPARISONS = [("bigaug", "intensity")]
 SIZE_BINS = [0, 1, 10, 50, math.inf]  # ml
 SIZE_LABELS = ["< 1 ml", "1-10 ml", "10-50 ml", ">= 50 ml"]
 RESULT_FILE = re.compile(r"(^|/)resultats_(id_test|ood_test)(_tent)?\.csv$")
@@ -45,6 +47,15 @@ INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
 # --- Lecture des sorties ---
 
+def display_path(path):
+    """Chemin relatif au dépôt quand c'est possible : aucun chemin absolu de la machine dans les sorties."""
+    path = Path(path)
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return path.name if path.is_absolute() else str(path)
+
+
 def iter_files(inputs, pattern):
     """(nom, date, contenu en octets) des fichiers dont le chemin correspond, dans les dossiers et les .zip."""
     for root in map(Path, inputs):
@@ -54,9 +65,9 @@ def iter_files(inputs, pattern):
                 with zipfile.ZipFile(path) as archive:
                     for info in archive.infolist():
                         if pattern.search(info.filename):
-                            yield f"{path}!{info.filename}", path.stat().st_mtime, archive.read(info)
+                            yield f"{display_path(path)}!{info.filename}", path.stat().st_mtime, archive.read(info)
             elif path.is_file() and pattern.search(path.as_posix()):
-                yield str(path), path.stat().st_mtime, path.read_bytes()
+                yield display_path(path), path.stat().st_mtime, path.read_bytes()
 
 
 def load_results(inputs):
@@ -70,7 +81,9 @@ def load_results(inputs):
     if not frames:
         raise SystemExit(f"Aucun fichier resultats_*.csv sous {', '.join(map(str, inputs))}")
     rows = pd.concat(frames, ignore_index=True)
-    rows = rows.sort_values("mtime").drop_duplicates(["technique", "split", "case_id"], keep="last")
+    rows = rows.sort_values("mtime", kind="stable").drop_duplicates(["technique", "split", "case_id"], keep="last")
+    # Ordre fixe des sujets : les IC bootstrap ne dépendent ni des dates des fichiers ni des autres runs présentes.
+    rows = rows.sort_values(["technique", "split", "case_id"], kind="stable")
     duplicates = sum(len(f) for f in frames) - len(rows)
     if duplicates:
         warnings.warn(f"{duplicates} lignes en double ignorées (sorties téléchargées plusieurs fois)")
@@ -83,6 +96,8 @@ def load_training(inputs):
     records = []
     for name, _, content in iter_files(inputs, SUMMARY_FILE):
         summary = json.loads(content)
+        if not summary.get("technique"):
+            continue  # autre résumé (adaptation continue…), pas une run du tableau
         state = summary.get("entrainement") or {}
         records.append(dict(technique=summary.get("technique"), run=summary.get("run"),
                             iterations=state.get("iteration"),
@@ -336,7 +351,61 @@ def save(fig, path):
     return path
 
 
-def aggregate(inputs, output, figures_dir=None, n_boot=10000):
+def direct_comparisons(rows, pairs=COMPARISONS, n_boot=10000):
+    """Comparaisons directes A - B (sujets appariés) : global ID et OOD, puis par centre OOD.
+
+    Hors correction de Holm : comparaisons secondaires entre deux techniques candidates au modèle final.
+    """
+    present = set(rows["technique"])
+    overall, by_center = [], []
+    for a, b in pairs:
+        if a not in present or b not in present:
+            continue
+        for split in ("id_test", "ood_test"):
+            x, y = paired(rows, a, split, reference=b)
+            d = x - y
+            mean, low, high = bootstrap_mean(d, n_boot) if len(d) else (math.nan,) * 3
+            overall.append(dict(a=a, b=b, split=split, n=len(d), dice_a=float(np.mean(x)) if len(d) else math.nan,
+                                dice_b=float(np.mean(y)) if len(d) else math.nan, delta=mean, ic_bas=low,
+                                ic_haut=high, mediane=float(np.median(d)) if len(d) else math.nan,
+                                favorables_a=int((d > 0).sum()), favorables_b=int((d < 0).sum()),
+                                p_wilcoxon=wilcoxon_p(x, y)))
+        ood = scored(rows[(rows["split"] == "ood_test") & rows["technique"].isin([a, b])])
+        grid = ood.pivot_table(index=["site", "case_id"], columns="technique", values="dice").dropna()
+        for site, group in grid.groupby(level="site"):
+            d = group[a] - group[b]
+            by_center.append(dict(a=a, b=b, site=site, n=len(d), dice_a=float(group[a].mean()),
+                                  dice_b=float(group[b].mean()), delta=float(d.mean()),
+                                  favorables_a=int((d > 0).sum()), favorables_b=int((d < 0).sum()),
+                                  p_wilcoxon=wilcoxon_p(group[a], group[b])))
+    columns = ["a", "b", "split", "n", "dice_a", "dice_b", "delta", "ic_bas", "ic_haut", "mediane", "favorables_a",
+               "favorables_b", "p_wilcoxon"]
+    center_columns = ["a", "b", "site", "n", "dice_a", "dice_b", "delta", "favorables_a", "favorables_b",
+                      "p_wilcoxon"]
+    return pd.DataFrame(overall, columns=columns), pd.DataFrame(by_center, columns=center_columns)
+
+
+def markdown_comparisons(overall, by_center):
+    if overall.empty:
+        return ""
+    name = lambda t: LABELS.get(t, t)
+    lines = ["## Comparaisons directes (hors correction de Holm)", "",
+             "| A - B | Test | n | Dice A | Dice B | Δ moyen [IC 95 %] | Médiane | Sujets A > B / A < B | p Wilcoxon |",
+             "|---|---|---|---|---|---|---|---|---|"]
+    for _, r in overall.iterrows():
+        lines.append(f"| {name(r.a)} - {name(r.b)} | {r.split.replace('_test', '').upper()} | {r.n} | {r.dice_a:.3f} | "
+                     f"{r.dice_b:.3f} | {fmt_ci(r.delta, r.ic_bas, r.ic_haut)} | {r.mediane:+.4f} | "
+                     f"{r.favorables_a} / {r.favorables_b} | {fmt_p(r.p_wilcoxon)} |")
+    lines += ["", "Par centre OOD :", "",
+              "| A - B | Centre | n | Dice A | Dice B | Δ moyen | Sujets A > B / A < B | p Wilcoxon |",
+              "|---|---|---|---|---|---|---|---|"]
+    for _, r in by_center.iterrows():
+        lines.append(f"| {name(r.a)} - {name(r.b)} | {r.site} | {r.n} | {r.dice_a:.3f} | {r.dice_b:.3f} | "
+                     f"{r.delta:+.3f} | {r.favorables_a} / {r.favorables_b} | {fmt_p(r.p_wilcoxon)} |")
+    return "\n".join(lines) + "\n"
+
+
+def aggregate(inputs, output, figures_dir=None, n_boot=10000, pairs=COMPARISONS):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     rows = load_results(inputs)
@@ -344,19 +413,23 @@ def aggregate(inputs, output, figures_dir=None, n_boot=10000):
         warnings.warn("Pas de résultats baseline : Δ et Wilcoxon non calculés")
     table = ablation_table(rows, n_boot)
     centers, sizes, training = per_center(rows), per_size(rows), load_training(inputs)
+    overall, by_center = direct_comparisons(rows, pairs, n_boot)
     table.to_csv(output / "tableau_rq3.csv", index=False)
     centers.to_csv(output / "par_centre.csv", index=False)
     sizes.to_csv(output / "par_taille.csv", index=False)
     training.to_csv(output / "entrainement.csv", index=False)
+    overall.to_csv(output / "comparaisons.csv", index=False)
+    by_center.to_csv(output / "comparaisons_par_centre.csv", index=False)
     sources = rows.groupby("technique")["source"].unique()
     text = ["# RQ3 - tableau d'ablation (pli 0)", "",
             f"Bootstrap : {n_boot} tirages, IC 95 % percentile. Wilcoxon apparié sur les sujets communs avec la "
             "baseline, correction de Holm sur les techniques. Dice sur les sujets à lésion non vide.", "",
-            markdown_table(table), "## Sources", ""]
+            markdown_table(table), markdown_comparisons(overall, by_center), "## Sources", ""]
     text += [f"- {LABELS.get(t, t)} : " + ", ".join(sorted(map(str, sources[t]))) for t in techniques_in(rows)]
     (output / "tableau_rq3.md").write_text("\n".join(text) + "\n", encoding="utf-8")
     paths = figures(rows, table, centers, sizes, Path(figures_dir or REPO_ROOT / "figures" / "rq3"))
-    return dict(table=table, centers=centers, sizes=sizes, training=training, figures=paths)
+    return dict(table=table, centers=centers, sizes=sizes, training=training, comparisons=overall,
+                comparisons_by_center=by_center, figures=paths)
 
 
 def main():
@@ -365,11 +438,16 @@ def main():
     parser.add_argument("--output", default=str(REPO_ROOT / "adaptation" / "runs" / "rq3_agregation"))
     parser.add_argument("--figures", default=str(REPO_ROOT / "figures" / "rq3"))
     parser.add_argument("--bootstrap", type=int, default=10000)
+    parser.add_argument("--comparer", action="append", metavar="A:B",
+                        help="comparaison directe A - B (répétable ; défaut : " +
+                             ", ".join(f"{a}:{b}" for a, b in COMPARISONS) + ")")
     args = parser.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # console Windows (cp1252)
-    result = aggregate(args.inputs, args.output, args.figures, args.bootstrap)
+    pairs = [tuple(pair.split(":", 1)) for pair in args.comparer] if args.comparer else COMPARISONS
+    result = aggregate(args.inputs, args.output, args.figures, args.bootstrap, pairs)
     print(markdown_table(result["table"]))
+    print(markdown_comparisons(result["comparisons"], result["comparisons_by_center"]))
     print(result["training"].drop(columns="source").to_string(index=False))
     for path in result["figures"]:
         print(path)
