@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
-    output=ROOT/'docs/yosra/demo_verification';output.mkdir(exist_ok=True)
+    output=ROOT/'docs/pipeline/demo_verification';output.mkdir(exist_ok=True)
     errors=[]
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',

@@ -7,12 +7,12 @@ from PIL import Image,ImageDraw,ImageFont
 
 
 def main():
-    root=Path(__file__).resolve().parents[1];images=root/'docs/yosra/demo_verification'
+    root=Path(__file__).resolve().parents[1];images=root/'docs/pipeline/demo_verification'
     shots=[('01_interface.png','01 · Démo locale Gradio'),
            ('02_rapport_synthetique.png','02 · Coupes et rapport : volume synthétique 2,091 mL'),
            ('03_niivue_coupes.png','03 · Visualisation multiplanaire NiiVue'),
            ('04_niivue_3d.png','04 · Rendu 3D NiiVue')]
-    output=root/'docs/yosra/demo_secours.mp4'
+    output=root/'docs/pipeline/demo_secours.mp4'
     try:font=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf',26)
     except OSError:font=ImageFont.load_default()
     with tempfile.TemporaryDirectory(prefix='avc-video-') as tmp:

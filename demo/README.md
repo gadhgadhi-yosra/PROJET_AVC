@@ -1,4 +1,4 @@
-# Démo locale — Yosra
+# Démo locale — Pipeline
 
 ## Lancement
 
@@ -75,7 +75,7 @@ Le Dockerfile lance le serveur intégré Gradio et NiiVue.
 ```
 
 Cela crée un phantom synthétique sous `data/demo/synthetic/` et l’animation
-`docs/yosra/demo_secours_synthetique.gif`. C’est un support de visualisation clairement
+`docs/pipeline/demo_secours_synthetique.gif`. C’est un support de visualisation clairement
 étiqueté, pas une inférence ou un résultat scientifique. Une vidéo de la vraie inférence
 reste à enregistrer après réception du modèle final.
 
@@ -106,7 +106,7 @@ une annotation fournie, pas une prédiction. Contrôler son recalage avec :
 ```
 
 Le Dockerfile construit aussi le visualiseur ; aucune seconde commande serveur n’est
-nécessaire dans le conteneur. Image locale vérifiée : `avc-demo:yosra-v2`.
+nécessaire dans le conteneur. Image locale vérifiée : `avc-demo:pipeline-v2`.
 Sur ce Mac, si Docker n’est pas dans PATH :
 `export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"`.
 
@@ -119,5 +119,5 @@ Les captures Chrome et la vidéo de secours proviennent d’un test réel de l�
 ```
 
 Le test navigateur utilise Google Chrome installé localement et le serveur déjà lancé.
-Le fichier `docs/yosra/demo_secours.mp4` montre un phantom synthétique : volume 2,091 mL,
+Le fichier `docs/pipeline/demo_secours.mp4` montre un phantom synthétique : volume 2,091 mL,
 coupes et vue 3D. Il ne valide pas les performances d’un modèle de segmentation.
