@@ -3,7 +3,7 @@
     subjects = load_processed("data/processed", split="train", fold=0)   # liste de torchio.Subject
     subject = subjects[0]                                                 # clés : t1, mask, brain, site…
 
-Format attendu : `<root>/<sujet>/{t1,mask,brain}.nii.gz` (RAS, 1 mm, z-score dans le cerveau stocké en
+Format attendu : `<root>/<sujet>/{t1,mask,brain}.nii.gz` (ou `.nii`, si Kaggle les a décompressés ; RAS, 1 mm, z-score dans le cerveau stocké en
 int16 avec `scl_slope`, fond à 0, recadré) et `qc.json`, plus la table `<root>/subjects.parquet`.
 Les images sont lues avec nibabel, à la demande : la liste ne charge que les en-têtes, qui sont
 vérifiés tout de suite. `data_raw.py` reste le repli sur les données brutes.
@@ -23,6 +23,8 @@ from .data_raw import EXCLUDED_SITES
 
 DEFAULT_PROCESSED = Path(__file__).resolve().parents[1] / "data" / "processed"
 VOLUMES = ("t1", "mask", "brain")
+# Kaggle décompresse les .nii.gz des datasets téléversés : les deux extensions sont acceptées.
+EXTENSIONS = (".nii.gz", ".nii")
 SPLITS = ("train", "val", "id_test", "ood_test")
 
 
@@ -46,25 +48,31 @@ def read_label(path):
 
 # --- Contrôles ---
 
+def volume_path(folder, name):
+    """Chemin de `<name>.nii.gz`, sinon de `<name>.nii` ; le premier si aucun n'existe (sujet manquant)."""
+    candidates = [folder / f"{name}{extension}" for extension in EXTENSIONS]
+    return next((path for path in candidates if path.is_file()), candidates[0])
+
+
 def check_geometry(paths, case):
     """Vérifie sur les en-têtes : RAS, 1 mm isotrope, même grille pour t1, mask et brain."""
     reference = None
     for name, path in paths.items():
         header = nib.load(path)
         if len(header.shape) != 3:
-            raise ProcessedFormatError(f"{case} : {name}.nii.gz a {len(header.shape)} dimensions au lieu de 3")
+            raise ProcessedFormatError(f"{case} : {path.name} a {len(header.shape)} dimensions au lieu de 3")
         codes = "".join(nib.aff2axcodes(header.affine))
         if codes != "RAS":
-            raise ProcessedFormatError(f"{case} : {name}.nii.gz est orienté {codes} au lieu de RAS "
+            raise ProcessedFormatError(f"{case} : {path.name} est orienté {codes} au lieu de RAS "
                                        "(contrat C1) ; refaire le prétraitement ou passer par data_raw")
         spacing = np.asarray(header.header.get_zooms()[:3], dtype=float)
         if not np.allclose(spacing, 1.0, atol=1e-3):
-            raise ProcessedFormatError(f"{case} : {name}.nii.gz a des voxels de {tuple(spacing.round(3))} mm "
+            raise ProcessedFormatError(f"{case} : {path.name} a des voxels de {tuple(spacing.round(3))} mm "
                                        "au lieu de 1 mm isotrope (contrat C1)")
         if reference is None:
             reference = (header.shape, header.affine)
         elif header.shape != reference[0] or not np.allclose(header.affine, reference[1], atol=1e-3):
-            raise ProcessedFormatError(f"{case} : {name}.nii.gz n'est pas sur la grille de t1.nii.gz")
+            raise ProcessedFormatError(f"{case} : {path.name} n'est pas sur la grille de t1")
 
 
 def split_case_ids(splits, split, fold=None):
@@ -116,7 +124,7 @@ def list_processed(root=DEFAULT_PROCESSED, split="train", fold=None, splits=DEFA
         if site in EXCLUDED_SITES or (sites is not None and site not in sites):
             continue
         folder = root / cases.loc[case, "subject"]
-        paths = {name: folder / f"{name}.nii.gz" for name in VOLUMES}
+        paths = {name: volume_path(folder, name) for name in VOLUMES}
         if case not in frame.index or not all(path.is_file() for path in paths.values()):
             missing.append(case)
             continue
@@ -148,7 +156,7 @@ def _empty_mask(row, folder):
     for value in (row.get("empty_mask"), _qc(folder).get("empty_mask")):
         if value is not None and not pd.isna(value):
             return bool(value)
-    return not bool(read_label(folder / "mask.nii.gz")[0].any())
+    return not bool(read_label(volume_path(folder, "mask"))[0].any())
 
 
 def _normalization(folder):

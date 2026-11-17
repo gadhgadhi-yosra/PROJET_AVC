@@ -1,0 +1,34 @@
+niveau,x,y,rho,p,n
+centres OOD,wasserstein,Dice baseline,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice intensity,-0.2,0.7040000000000001,6
+centres OOD,wasserstein,Dice bigaug,-0.028571428571428574,0.9571545189504373,6
+centres OOD,wasserstein,Dice fda,-0.4285714285714286,0.3965014577259473,6
+centres OOD,wasserstein,Dice histogram_matching,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice dann,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice baseline+tent,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice continue_fige,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice continue_controlee,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice continue_tent,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,Dice continue_auto_apprentissage,-0.3142857142857143,0.5440932944606415,6
+centres OOD,wasserstein,volume médian des lésions,0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice baseline,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice intensity,-0.2571428571428572,0.6227871720116619,6
+centres OOD,mmd,Dice bigaug,-0.08571428571428573,0.8717434402332361,6
+centres OOD,mmd,Dice fda,-0.3714285714285715,0.4684781341107872,6
+centres OOD,mmd,Dice histogram_matching,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice dann,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice baseline+tent,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice continue_fige,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice continue_controlee,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice continue_tent,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,Dice continue_auto_apprentissage,-0.14285714285714288,0.7871720116618076,6
+centres OOD,mmd,volume médian des lésions,-0.3714285714285715,0.4684781341107872,6
+centres de test ID + OOD,wasserstein,Dice baseline,0.08682476484477028,0.5751995826549373,44
+centres de test ID + OOD,wasserstein,Dice baseline+tent,0.09077134506498712,0.557884189473021,44
+centres de test ID + OOD,wasserstein,Dice bigaug,0.04383368569415081,0.7775409261636049,44
+centres de test ID + OOD,wasserstein,Dice dann,0.04735729386892177,0.7601676043010129,44
+centres de test ID + OOD,wasserstein,Dice fda,0.054122621564482026,0.727142232830191,44
+centres de test ID + OOD,wasserstein,Dice histogram_matching,0.03495419309372797,0.8217818598291466,44
+centres de test ID + OOD,wasserstein,Dice intensity,0.11839323467230442,0.4440206525591517,44
+sujets OOD,volume de la lésion,Dice intensity,0.5347034772291651,5.3471572084733405e-21,265
+sujets OOD,contraste de la lésion,Dice intensity,-0.1945199367120786,0.0014624401986093802,265
