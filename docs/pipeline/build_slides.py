@@ -22,7 +22,7 @@ def text(slide, value, x, y, w, h, size=22, color=INK):
 def main():
     deck=Presentation();deck.slide_width=Inches(13.333);deck.slide_height=Inches(7.5)
     slides=[
-        ('Préparer, mesurer, expliquer', 'Segmentation des lésions d’AVC sur IRM T1\nContribution de Yosra · données, Spark, domain shift et démonstration\nÉtat local au 12 novembre 2026',None,
+        ('Préparer, mesurer, expliquer', 'Segmentation des lésions d’AVC sur IRM T1\nDonnées et analyses · données, Spark, domain shift et démonstration\nÉtat local au 12 novembre 2026',None,
          'Mon rôle est de fournir des données traçables et de mesurer le décalage entre centres. Les modèles et l’adaptation sont les contributions de Fayfa et Anas.'),
         ('Un dataset contrôlé et versionné', '1 453 paires · 55 centres\n1 415 volumes prétraités\n37 cas R032 exclus + 1 quarantaine QC\nSplit v2 : 1 415 cas validés et exportés\nAnnotations brutes conservées',None,
          'La version 1 du split est archivée. La version 2 retire un cas ; les autres affectations sont conservées. Relecture collective de la quarantaine nécessaire. La tolérance de recadrage existante est de 1 %.'),
@@ -42,7 +42,7 @@ def main():
     for index,(title,body,figure,notes) in enumerate(slides,1):
         slide=deck.slides.add_slide(deck.slide_layouts[6])
         slide.background.fill.solid();slide.background.fill.fore_color.rgb=RGBColor.from_string(BG)
-        text(slide,'PROJET AVC / YOSRA',.55,.25,10,.4,12,ACCENT)
+        text(slide,'PROJET AVC / DONNÉES ET ANALYSES',.55,.25,10,.4,12,ACCENT)
         text(slide,title,.55,.85,12.2,.9,32)
         if figure and (ROOT/figure).exists():
             text(slide,body,.55,2.0,4.2,4.5,21)
@@ -54,7 +54,7 @@ def main():
             text(slide,body,.65,2.0,11.8,4.5,27)
         text(slide,f'RECHERCHE · résultats provisoires / voir rapports locaux                                      {index:02d} / 08',.55,7.0,12.2,.3,10)
         slide.notes_slide.notes_text_frame.text=notes
-    path=OUT/'Soutenance_Yosra.pptx';deck.save(path)
+    path=OUT/'Soutenance_Projet_AVC.pptx';deck.save(path)
     check=Presentation(path)
     assert len(check.slides)==8
     print(path)

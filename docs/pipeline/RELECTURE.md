@@ -1,7 +1,7 @@
 # Relecture des supports — 12 novembre 2026
 
 La relecture documentaire est effectuée. Elle ne vaut ni validation clinique du QC,
-ni approbation collective, ni répétition réellement chronométrée avec Yosra.
+ni approbation collective, ni répétition réellement chronométrée avec l’équipe.
 
 | Vérification | Résultat |
 |---|---|
@@ -22,7 +22,7 @@ objets ; il ne détecte pas toutes les substitutions de polices ou tous les déb
 
 ## À ouvrir pour la répétition
 
-1. `Soutenance_Yosra.pptx` — support affiché.
+1. `Soutenance_Projet_AVC.pptx` — support affiché.
 2. `SCRIPT_ORAL.md` — texte et repères de temps.
 3. `demo_secours.mp4` — secours, clairement synthétique.
 4. `VALIDATION_EQUIPE.md` — points à discuter après la répétition.

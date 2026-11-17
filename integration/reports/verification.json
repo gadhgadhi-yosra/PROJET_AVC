@@ -6,7 +6,7 @@
     "adaptation-dann": "d0a9a93",
     "adaptation-tent": "5834f0e"
   },
-  "yosra_tests": {
+  "pipeline_tests": {
     "passed": 34
   },
   "generalization_adaptation_without_calibration": {

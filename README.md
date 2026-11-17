@@ -1,11 +1,11 @@
-# Projet AVC — travail de Yosra
+# Projet AVC — pipeline et analyses
 
 Segmentation des lésions sur IRM T1 et analyse du domain shift inter-centres.
 Les responsabilités sont décrites dans `docs/Repartition_Taches_Equipe.pdf`.
 
-Commencer par [le suivi des 14 semaines](docs/yosra/SUIVI_SEMAINES.md), puis
-[les sections de rapport](docs/yosra/RAPPORT.md) et [les supports d’oral](docs/yosra/SOUTENANCE.md).
-Le [diaporama éditable](docs/yosra/Soutenance_Yosra.pptx) contient huit diapositives avec notes.
+Commencer par [le suivi des 14 semaines](docs/pipeline/SUIVI_SEMAINES.md), puis
+[les sections de rapport](docs/pipeline/RAPPORT.md) et [les supports d’oral](docs/pipeline/SOUTENANCE.md).
+Le [diaporama éditable](docs/pipeline/Soutenance_Projet_AVC.pptx) contient huit diapositives avec notes.
 
 ## Environnements
 
@@ -32,7 +32,8 @@ prédictions doivent rester sous `data/` dans les dossiers ignorés par Git.
 | S5–S6 | [Statistiques et empreinte](analysis/README.md) |
 | S7–S10 | [Analyses Dice, temps et représentations](analysis/ANALYSES_S7_S10.md) |
 | S8–S12 | [Démo Gradio, NiiVue, atlas et Docker](demo/README.md) |
-| S12–S14 | [Rapport](docs/yosra/RAPPORT.md), [oral et répétitions](docs/yosra/SOUTENANCE.md) |
+| Tout le projet | [Frontend web : tableau de bord + démo IRM](frontend/README.md) |
+| S12–S14 | [Rapport](docs/pipeline/RAPPORT.md), [oral et répétitions](docs/pipeline/SOUTENANCE.md) |
 
 Le code S7–S10 peut être testé sans modèle, mais ses résultats scientifiques exigent
 les véritables prédictions et checkpoints de Fayfa/Anas. Aucun Dice n’est simulé dans
@@ -42,8 +43,8 @@ les livrables scientifiques. La démo distingue un masque fourni d’une infére
 refuse les cas manquants ; ne pas modifier silencieusement `splits.json` pour contourner le QC.
 
 Livraison actuelle : **split v2, 1 415 cas validés et exportés**, 38 exclusions documentées.
-Démo et image Docker testées ; [vidéo de secours synthétique](docs/yosra/demo_secours.mp4).
-Voir [la remise technique et les entrées modèles encore nécessaires](docs/yosra/REMISE_EQUIPE.md).
+Démo et image Docker testées ; [vidéo de secours synthétique](docs/pipeline/demo_secours.mp4).
+Voir [la remise technique et les entrées modèles encore nécessaires](docs/pipeline/REMISE_EQUIPE.md).
 
 ## Raccordement avec les branches de Fayfa
 

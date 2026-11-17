@@ -25,7 +25,7 @@ def main():
         fig.suptitle('EXEMPLE SYNTHÉTIQUE · masque construit, aucune inférence',fontsize=11)
         buffer=io.BytesIO();fig.savefig(buffer,format='png',dpi=80);plt.close(fig)
         buffer.seek(0);frames.append(Image.open(buffer).convert('RGB'))
-    out=Path('docs/yosra/demo_secours_synthetique.gif')
+    out=Path('docs/pipeline/demo_secours_synthetique.gif')
     frames[0].save(out,save_all=True,append_images=frames[1:],duration=200,loop=0)
     import json
     (root/'report.json').write_text(json.dumps(summarize(image,mask),indent=2))

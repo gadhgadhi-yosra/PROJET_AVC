@@ -1,4 +1,4 @@
-# Exécuter les dernières analyses de Yosra
+# Exécuter les dernières analyses du pipeline
 
 Le code C1, généralisation, DANN et TENT est intégré. L’analyse S8 historique est produite.
 La vérification Git et locale du 12 novembre n’a trouvé ni nouveau commit distant,
@@ -51,4 +51,4 @@ Les CSV historiques disponibles utilisent une autre partition que C1 v2. Merci a
 de préciser la convention Dice des masques vides et la couche à utiliser pour les features. »
 
 Ce message est préparé, **pas envoyé**. Les répétitions et la relecture finale restent
-à faire avec l’équipe ; le support actuel est `Soutenance_Yosra.pptx`.
+à faire avec l’équipe ; le support actuel est `Soutenance_Projet_AVC.pptx`.

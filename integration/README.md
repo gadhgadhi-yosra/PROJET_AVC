@@ -1,14 +1,14 @@
-# Raccordement Yosra / Fayfa
+# Intégration du pipeline et des modèles
 
 Les branches `generalisation-chargeur-c1` (`214647d`), `adaptation-dann` (`d0a9a93`)
 et `adaptation-tent` (`5834f0e`) sont fusionnées localement dans `exploration-donnees`.
-Elles incluent les baselines d’Anas (`00e2692`). Les modifications de Yosra sont conservées,
-avec une sauvegarde Git dans le stash « Sauvegarde travail Yosra avant integration Fayfa ».
+Elles incluent les baselines d’Anas (`00e2692`). Les modifications du pipeline sont conservées,
+avec une sauvegarde Git préalable dans un stash.
 Aucun push n’est effectué.
 
 ## Connexion des données
 
-Le chargeur de Fayfa lit directement les sorties de Yosra : `data/processed/subjects.parquet`,
+Le chargeur de Fayfa lit directement les sorties du pipeline : `data/processed/subjects.parquet`,
 les trois volumes par sujet et le **split v2** actif. Aucune copie ni renormalisation n’est nécessaire.
 
 ```python
@@ -42,7 +42,7 @@ MPLCONFIGDIR=/tmp/avc-mpl OMP_NUM_THREADS=2 .venv-integration/bin/python -m pyte
 
 Les CSV récupérés dans `baselines/outputs/fast_results/` contiennent de vrais résultats
 versionnés, sur **un ancien protocole** (903 train, 226 ID validation, 287 OOD).
-Ils ne sont pas les résultats des cinq plis de Yosra. `check_team.py` rattache les identifiants
+Ils ne sont pas les résultats des cinq plis du pipeline. `check_team.py` rattache les identifiants
 à C1 sous `data/predictions/historical_baselines/` et produit les chevauchements agrégés dans
 `reports/team_compatibility.json`, sans leur inventer un numéro de pli.
 Ne pas les passer aux analyses S7 comme s’ils provenaient de C1 v2.
@@ -76,7 +76,7 @@ Le pilote `generalization/preprocess_c1_local.py` applique maintenant aussi
 
 ## Vérification finale du 12 novembre 2026
 
-**242 tests réussis** : 34 côté Yosra, 179 généralisation/adaptation (dont les patches
+**242 tests réussis** : 34 pour le pipeline, 179 généralisation/adaptation (dont les patches
 C1 réels), 29 calibration. Le chargeur a été contrôlé sur les 1 415 cas et les cinq plis.
 Les dépendances CPU passent `pip check`. Aucun conflit Git ne reste ouvert.
 Résultats détaillés : `reports/verification.json` et `reports/team_compatibility.json`.
@@ -93,4 +93,4 @@ Configurer `experiments.json`, puis exécuter :
 Le premier appel audite les entrées ; le second exécute les expériences prêtes.
 Quatre tests vérifient les cas manquants, le mauvais split, les livraisons incomplètes
 et une livraison complète. État actuel : `reports/remaining_readiness.json`.
-Détails : `docs/yosra/PROCHAINE_ETAPE.md`.
+Détails : `docs/pipeline/PROCHAINE_ETAPE.md`.

@@ -4,7 +4,7 @@ Techniques de généralisation de la question RQ3 (§3.5 du document de projet) 
 
 État au 4 novembre 2026 :
 
-- **données C1 produites et vérifiées sur cette machine** : 1 415 sujets prétraités par le code de Yosra (un échec, `R065_sub-r065s019`) ; `load_processed` les charge sur tous les découpages sans erreur de format ([détail](#données-c1-sur-cette-machine)) ;
+- **données C1 produites et vérifiées sur cette machine** : 1 415 sujets prétraités par le code du pipeline (un échec, `R065_sub-r065s019`) ; `load_processed` les charge sur tous les découpages sans erreur de format ([détail](#données-c1-sur-cette-machine)) ;
 - **calibrage refait sur C1**, la source de l'entraînement : gamma 0,68 – 1,79, contraste 0,77 – 1,53, référence R059 (par pli : R059, R071, R059, R004, R071), `beta` de FDA et gamma de BigAug re-balayés ([détail](#recalibrage-sur-c1-du-4-novembre-2026)). Un test échoue si un centre de test sert à un réglage ;
 - chargeur C1 (`data_processed.py`) ; les scripts acceptent `--source raw|processed` ;
 - les 187 tests passent sur des volumes synthétiques (3 de plus se lancent avec les données réelles) ;
@@ -18,7 +18,7 @@ Ce qui reste à faire est [en fin de document](#reste-à-faire).
 |---|---|
 | `data_processed.py` | Charge les données prétraitées du contrat C1 en `torchio.Subject`, par découpage et par pli de `splits.json` |
 | `data_raw.py` | Repli : liste et charge les sujets bruts en `torchio.Subject` (RAS, 1 mm, z-score dans le cerveau) |
-| `preprocess_c1_local.py` | Produit les données C1 sous Windows avec le code de Yosra tel quel, sans Spark |
+| `preprocess_c1_local.py` | Produit les données C1 sous Windows avec le code du pipeline tel quel, sans Spark |
 | `transforms/` | Les transformations et `build_transforms(config)` |
 | `configs/*.yaml` | Une configuration par famille, plus `baseline.yaml` (aucune transformation) |
 | `contrast.py` | Rapport d'intensité lésion / tissu voisin |
@@ -85,7 +85,7 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 
 ## Données prétraitées (contrat C1)
 
-`load_processed(root, split="train", fold=None)` lit la sortie de `preprocessing/week4.py` (Yosra) : `<root>/<sujet>/{t1,mask,brain}.nii.gz`, `qc.json` et la table `<root>/subjects.parquet` (statut `ok` seulement). Elle renvoie une liste de `torchio.Subject` avec les clés `t1`, `mask`, `brain`, `site`, `subject`, `case_id`, `empty_mask`, `norm_mean` et `norm_std`.
+`load_processed(root, split="train", fold=None)` lit la sortie de `preprocessing/week4.py` (Pipeline) : `<root>/<sujet>/{t1,mask,brain}.nii.gz`, `qc.json` et la table `<root>/subjects.parquet` (statut `ok` seulement). Elle renvoie une liste de `torchio.Subject` avec les clés `t1`, `mask`, `brain`, `site`, `subject`, `case_id`, `empty_mask`, `norm_mean` et `norm_std`.
 
 - **Découpages** : `split` vaut `"train"`, `"id_test"` ou `"ood_test"` ; avec `fold=k`, `"train"` et `"val"` sont ceux du pli k et `"id_test"` le test ID du pli. `split="val"` sans pli est refusé.
 - **Lecture** : nibabel, à la demande (les volumes ne sont lus qu'à `subject["t1"].data`) ; les sujets sont sérialisables pour les `DataLoader`. Le z-score stocké en int16 avec `scl_slope = 0,001` est relu en float32.
@@ -108,7 +108,7 @@ Avec `--source processed`, la calibration reconstruit les intensités brutes dan
 
 ### Données C1 sur cette machine
 
-Les données C1 ont été produites le 4 novembre 2026 sur ce poste Windows, avec le code de Yosra tel quel. Son lanceur (`preprocessing/run_week4.sh`) vise macOS et Spark exige `winutils.exe` sous Windows (`addPyFile` échoue sans `HADOOP_HOME`) : `preprocess_c1_local.py` appelle donc ses fonctions `pipeline.inventory` et `week4.work` sans les modifier, avec des processus Python au lieu de Spark et la même règle pour les volumes de plus de 40 M voxels (un par un, à la fin).
+Les données C1 ont été produites le 4 novembre 2026 sur ce poste Windows, avec le code du pipeline tel quel. Son lanceur (`preprocessing/run_week4.sh`) vise macOS et Spark exige `winutils.exe` sous Windows (`addPyFile` échoue sans `HADOOP_HOME`) : `preprocess_c1_local.py` appelle donc ses fonctions `pipeline.inventory` et `week4.work` sans les modifier, avec des processus Python au lieu de Spark et la même règle pour les volumes de plus de 40 M voxels (un par un, à la fin).
 
 ```powershell
 uv venv --python 3.12 .venv-spark                                        # environnement du pipeline, ignoré par Git
@@ -123,7 +123,7 @@ Résultat (1 453 sujets, 50 min avec 2 processus) :
 - **1 415 sujets `ok`**, 37 exclus (R032), **1 échec : `R065_sub-r065s019`** (`lesion_outside_image_based_crop` : plus de 1 % de la lésion hors du recadrage calculé sur l'image). Ce sujet appartient au pool d'entraînement (validation du pli 0) ; `on_missing="warn"` l'écarte. À traiter côté C1.
 - **`load_processed` sur tous les découpages** : entraînement 916/917, test ID 231/231, test OOD 268/268, plis 732 à 734 sujets ; aucune erreur de format (RAS, 1 mm, grilles), aucun sujet orphelin, identifiants conformes à `splits.json`.
 - **Masques vides** : les 5 connus (R041 s108 et R065 s002 en entraînement ; R053 s016, SOOP 0910 et 0961 en test OOD), gardés comme cas négatifs.
-- **Validateur de Yosra** (`preprocessing/validate_s4.py`) : sur un essai de 92 sujets, `sub-r002s001` est rejeté de justesse (moyenne du cerveau 1,24e-4 et écart-type 0,99987 pour une tolérance de 1e-4) ; c'est l'effet du z-score stocké en int16 (pas de 0,001), pas une erreur. Signalé à Yosra.
+- **Validateur du pipeline** (`preprocessing/validate_s4.py`) : sur un essai de 92 sujets, `sub-r002s001` est rejeté de justesse (moyenne du cerveau 1,24e-4 et écart-type 0,99987 pour une tolérance de 1e-4) ; c'est l'effet du z-score stocké en int16 (pas de 0,001), pas une erreur. Signalé à l’équipe.
 
 ## Ce que fait le chargement provisoire (données brutes)
 
@@ -444,7 +444,7 @@ Reste :
 
 1. **Étendre la vérification visuelle** à plusieurs sujets par centre et aux centres d'entraînement non regardés, avant les premiers entraînements.
 2. **Refaire le calibrage si `splits.json` ou C1 change** : `test_calibration.py` le signale par l'empreinte du fichier. Relancer `python -m generalization.calibration --source processed`, puis les deux balayages, et reporter les plages dans les YAML et dans les sections `fda_beta` et `bigaug_gamma` de `calibration.json`.
-3. **`R065_sub-r065s019`** : en échec côté C1 (`lesion_outside_image_based_crop`), écarté par `on_missing="warn"`. Si Yosra le corrige, relancer `preprocess_c1_local.py` (reprise automatique des autres sujets).
+3. **`R065_sub-r065s019`** : en échec côté C1 (`lesion_outside_image_based_crop`), écarté par `on_missing="warn"`. Si ce cas est corrigé, relancer `preprocess_c1_local.py` (reprise automatique des autres sujets).
 4. **Chargement des données brutes lent** (repli seulement) : `load_subject` prend 1,2 s en médiane, mais 6,7 s pour SOOP et jusqu'à 28 s (volumes SOOP natifs à 0,25 mm). Les données C1, déjà à 1 mm et recadrées, règlent ce point pour l'entraînement.
 5. **Vérifier les valeurs de BigAug** dans l'article.
 

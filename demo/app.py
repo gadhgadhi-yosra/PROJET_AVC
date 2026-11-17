@@ -37,7 +37,7 @@ def run(t1, supplied_mask, uncertainty, atlas, brain, position):
 
 def build_app():
     with gr.Blocks(title='AVC · Domain shift') as app:
-        gr.Markdown('# AVC · Explorer une segmentation\nDémo de recherche de Yosra. Chargez une IRM et un masque, ou utilisez le modèle configuré par l’équipe.')
+        gr.Markdown('# AVC · Explorer une segmentation\nDémo de recherche du projet AVC. Chargez une IRM et un masque, ou utilisez le modèle configuré par l’équipe.')
         with gr.Row():
             with gr.Column(scale=1):
                 t1 = gr.File(label='IRM T1 (.nii / .nii.gz)', type='filepath')

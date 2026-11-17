@@ -100,8 +100,8 @@ Le QC sauvegarde également ses résultats par sujet dans `_qc_cache/` pour repr
 ## Livraison v2
 
 Le split actif retire uniquement `R065_sub-r065s019_ses-1` (quarantaine QC), en plus
-des 37 exclusions R032. Le split v1 est archivé dans `docs/yosra/releases/`.
+des 37 exclusions R032. Le split v1 est archivé dans `docs/pipeline/releases/`.
 Les 1 415 cas restants sont validés et exportés : 916 train/val, 231 ID, 268 OOD.
 `preprocessing/qc_exclusions.json` est appliqué par défaut aux relances du traitement.
 Les bruts restent intacts. La décision technique doit être relue avec l’équipe.
-Provenance : `preprocessing/reports/release_v2.json` ; remise : `docs/yosra/REMISE_EQUIPE.md`.
+Provenance : `preprocessing/reports/release_v2.json` ; remise : `docs/pipeline/REMISE_EQUIPE.md`.

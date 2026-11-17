@@ -1,7 +1,7 @@
 # Remise technique à Fayfa et Anas — version 2
 
 Le split actif est désormais **`splits.json`, version 2**. La version 1 est conservée
-dans `docs/yosra/releases/splits_v1.json`. Aucun centre n’a changé de rôle et aucun cas
+dans `docs/pipeline/releases/splits_v1.json`. Aucun centre n’a changé de rôle et aucun cas
 restant n’a été déplacé d’un pli à un autre. Un seul cas est mis en quarantaine technique :
 `R065_sub-r065s019_ses-1`, en raison d’une annotation isolée hors du support de l’image.
 Les fichiers bruts et leurs annotations restent intacts.
@@ -26,7 +26,7 @@ dans `splits_final.json` : les copier dans le dossier prétraité nnU-Net, comme
 `preprocessing/SEMAINE4.md`. Exécuter le contrôle officiel nnU-Net dans l’environnement
 d’entraînement. Les vérités terrain ID/OOD sont séparées des labels d’entraînement.
 
-À remettre pour les analyses de Yosra : CSV `model,technique,fold,case_id,site,dice`,
+À remettre pour les analyses du pipeline : CSV `model,technique,fold,case_id,site,dice`,
 checkpoint, architecture, preprocessing, version/empreinte du split, fonction de prédiction
 retournant un masque dans la grille native et fonction d’extraction des caractéristiques.
 Placer les fichiers privés sous `data/predictions/` et `data/features/`.

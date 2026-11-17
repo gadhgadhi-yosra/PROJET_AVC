@@ -1,6 +1,6 @@
-# Suivi Yosra — semaine 3, du 12 au 18 octobre 2026
+# Suivi Pipeline — semaine 3, du 12 au 18 octobre 2026
 
-Mise à jour : 13 octobre 2026. Périmètre : fiche Yosra, environnement/données et début du pipeline Spark du document de répartition. Les tâches des autres membres et de la semaine 4 ne sont pas incluses.
+Mise à jour : 13 octobre 2026. Périmètre : volet données, prétraitement et analyses, environnement/données et début du pipeline Spark du document de répartition. Les tâches des autres membres et de la semaine 4 ne sont pas incluses.
 
 | Tâche | État et preuve |
 |---|---|
