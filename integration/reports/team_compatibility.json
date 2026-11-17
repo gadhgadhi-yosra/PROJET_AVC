@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "split_version": 2,
+  "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1",
+  "c1_loader_counts": {
+    "train": 916,
+    "id_test": 231,
+    "ood_test": 268
+  },
+  "folds_checked": 5,
+  "baseline_results": {
+    "historical_protocol": "903 train / 226 id_val / 287 ood_test; no C1 fold equivalence",
+    "current_protocol": "C1 split v2",
+    "assignment_counts": {
+      "id_val": {
+        "excluded": 0,
+        "id_test": 36,
+        "ood_test": 49,
+        "train": 141
+      },
+      "ood_test": {
+        "excluded": 0,
+        "id_test": 54,
+        "ood_test": 24,
+        "train": 209
+      },
+      "train": {
+        "excluded": 1,
+        "id_test": 141,
+        "ood_test": 195,
+        "train": 566
+      }
+    },
+    "compatible_with_current_s7": false,
+    "reason": "Different patient/center split; ID used as validation, not an independent C1 test.",
+    "mapped_result_rows": {
+      "cnn_pretrained_freeze-encoder_cases": 513,
+      "cnn_pretrained_freeze-none_cases": 513,
+      "cnn_pretrained_freeze-partial_cases": 513,
+      "cnn_random_init_cases": 513,
+      "ml_gradient_boosting_cases": 300,
+      "ml_logistic_regression_cases": 300,
+      "ml_random_forest_cases": 300
+    }
+  }
+}

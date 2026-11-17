@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "split_version": 2,
+  "split_sha256": "c5fbf3ae1185f42dce7bd1a4c99fe6f0f5787cf5add809b03447bc465e768ab1",
+  "file_counts": {
+    "imagesTr": 916,
+    "labelsTr": 916,
+    "imagesTs": 499,
+    "evaluation_labels/id": 231,
+    "evaluation_labels/ood": 268
+  },
+  "fold_membership": "exact_match",
+  "official_nnunet_validation": "pending_training_environment"
+}

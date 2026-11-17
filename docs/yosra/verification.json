@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-13",
+  "unit_tests": 50,
+  "unit_status": "passed",
+  "synthetic_cli_workflows": 5,
+  "gradio_components": 17,
+  "gradio_config_http": 200,
+  "synthetic_volume_ml": 2.091,
+  "full_available_validation": "preprocessing/reports/validation_s4_complete_available.json",
+  "full_export": "passed_1415_split_v2",
+  "browser_webgl": "passed_chrome_software_webgl_no_page_errors",
+  "docker_build": "passed",
+  "real_model_inference": "pending_checkpoints",
+  "mni_registration": "passed_native_grid_integer_labels_visual_overlay_reviewed; expert_anatomical_review_pending",
+  "docker_image": "sha256:1d5b7e00881094457a073ee38d778f950cea70a04d813e6ccbbdc15276fc1432",
+  "video": "demo_secours.mp4_synthetic_screenshots",
+  "temporal_metadata": {
+    "valid": 1073,
+    "missing_or_invalid": 342
+  },
+  "atlas_labels_inside_image_support_fraction": 0.9775358055096321,
+  "export_evidence": "preprocessing/reports/export_v2.json",
+  "video_decode": "passed_ffmpeg_full_decode",
+  "team_integration": "integration/reports/verification.json",
+  "historical_s8": {
+    "status": "executed",
+    "report": "analysis/reports/s8_historical/summary.json",
+    "tests": 4,
+    "permutations_per_group": 999,
+    "protocol": "historical_baselines_00e2692",
+    "c1_v2_result": false
+  },
+  "remaining_runner": {
+    "tests_passed": 4,
+    "audit": "integration/reports/remaining_readiness.json",
+    "status": "waiting_for_c1_results"
+  },
+  "document_review": "docs/yosra/relecture.json",
+  "oral_script": "docs/yosra/SCRIPT_ORAL.md",
+  "collective_validation": "pending",
+  "human_rehearsal": "pending",
+  "s6_uncertainty": {
+    "status": "executed",
+    "tests_passed": 4,
+    "bootstrap_repeats": 10000,
+    "train": 912,
+    "held_out": 228,
+    "report": "analysis/reports/s6_uncertainty/summary.json",
+    "scope": "conditional_exploratory_not_external_validation"
+  },
+  "qc_by_center": {
+    "status": "executed",
+    "tests_passed": 4,
+    "report": "analysis/reports/qc_by_center/summary.json",
+    "centers_inventoried": 55,
+    "retained": 1415,
+    "excluded": 38,
+    "empty_masks_retained": 5,
+    "missing_or_invalid_delay_retained": 342
+  }
+}

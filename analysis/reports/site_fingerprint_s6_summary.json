@@ -1,8 +1,8 @@
 {
-  "date": "2026-11-02",
-  "scans": 1130,
+  "date": "2026-11-11",
+  "scans": 1140,
   "sites": 25,
   "chance": 0.04,
-  "shuffled_labels_control": 0.04105692076428381,
+  "shuffled_labels_control": 0.03990926751117894,
   "min_subjects": 20
 }

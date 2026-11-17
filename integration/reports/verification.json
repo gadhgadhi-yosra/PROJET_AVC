@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-12",
+  "merged_local_head": "7313bfd",
+  "branches": {
+    "generalisation-chargeur-c1": "214647d",
+    "adaptation-dann": "d0a9a93",
+    "adaptation-tent": "5834f0e"
+  },
+  "yosra_tests": {
+    "passed": 34
+  },
+  "generalization_adaptation_without_calibration": {
+    "passed": 179,
+    "real_c1_tests_included": true
+  },
+  "loader_audit": "team_compatibility.json",
+  "calibration": {
+    "status": "recomputed_on_916_c1_subjects",
+    "split_version": 2,
+    "sha256_16": "c5fbf3ae1185f42d",
+    "manual_sweeps": "historical_v1_provenance_retained"
+  },
+  "pip_check": "passed",
+  "trained_checkpoints_present": false,
+  "push_performed": false,
+  "calibration_tests": {
+    "passed": 29
+  },
+  "total_passed": 242,
+  "status": "passed"
+}

@@ -1,0 +1,439 @@
+{
+  "date": "2026-11-04",
+  "source": "processed",
+  "splits": {
+    "file": "splits.json",
+    "version": 1,
+    "seed": 2026,
+    "sha256_16": "cc01a2522a90fd55"
+  },
+  "held_out_sites": [
+    "R008",
+    "R028",
+    "R031",
+    "R032",
+    "R034",
+    "R053",
+    "SOOP"
+  ],
+  "training_sites": [
+    "R001",
+    "R002",
+    "R003",
+    "R004",
+    "R005",
+    "R009",
+    "R010",
+    "R011",
+    "R014",
+    "R015",
+    "R016",
+    "R017",
+    "R018",
+    "R019",
+    "R020",
+    "R023",
+    "R024",
+    "R027",
+    "R029",
+    "R030",
+    "R033",
+    "R035",
+    "R038",
+    "R039",
+    "R040",
+    "R041",
+    "R042",
+    "R044",
+    "R045",
+    "R046",
+    "R047",
+    "R048",
+    "R049",
+    "R050",
+    "R052",
+    "R056",
+    "R057",
+    "R058",
+    "R059",
+    "R061",
+    "R062",
+    "R063",
+    "R064",
+    "R065",
+    "R067",
+    "R069",
+    "R070",
+    "R071"
+  ],
+  "n_training_subjects": 916,
+  "gamma": {
+    "range": [
+      0.68,
+      1.79
+    ],
+    "raw": [
+      0.686,
+      1.783
+    ],
+    "sites": [
+      "R040",
+      "R030"
+    ],
+    "position_median": 0.604
+  },
+  "contrast": {
+    "range": [
+      0.77,
+      1.53
+    ],
+    "raw": [
+      0.772,
+      1.527
+    ],
+    "sites": [
+      "R020",
+      "R030"
+    ],
+    "cv_median": 0.406
+  },
+  "reference": {
+    "site": "R059",
+    "criteria": "au moins 20 sujets d'entraînement, 1 mm isotrope, au moins 200 niveaux de gris ; plus petite distance W1 au reste du pool",
+    "ranking": [
+      {
+        "site": "R059",
+        "n": 30,
+        "w1": 0.0094
+      },
+      {
+        "site": "R071",
+        "n": 21,
+        "w1": 0.0129
+      },
+      {
+        "site": "R004",
+        "n": 30,
+        "w1": 0.0153
+      },
+      {
+        "site": "R011",
+        "n": 23,
+        "w1": 0.0163
+      },
+      {
+        "site": "R010",
+        "n": 21,
+        "w1": 0.0179
+      },
+      {
+        "site": "R052",
+        "n": 26,
+        "w1": 0.0191
+      },
+      {
+        "site": "R001",
+        "n": 31,
+        "w1": 0.0278
+      },
+      {
+        "site": "R009",
+        "n": 89,
+        "w1": 0.0309
+      }
+    ]
+  },
+  "fda_beta": {
+    "range": [
+      0.015,
+      0.03
+    ],
+    "previous": [
+      0.015,
+      0.03
+    ],
+    "date": "2026-11-04",
+    "source": "processed",
+    "reference_site": "R059",
+    "sweep_sites": [
+      "R015",
+      "R029",
+      "R014",
+      "R030",
+      "R039",
+      "R040"
+    ],
+    "references_per_subject": 4,
+    "betas": [
+      0.01,
+      0.015,
+      0.02,
+      0.03,
+      0.04,
+      0.05,
+      0.06,
+      0.08,
+      0.12
+    ],
+    "criteria": "borne basse : demi-côté b >= 2 sur tous les volumes (sinon changement négligeable) ; borne haute : b sous le trentième du plus petit côté (ombrage de plusieurs centimètres, pas de taches de la taille d'une lésion) et contraste conservé minimal >= 0,65",
+    "half_width": {
+      "0.015": [
+        2,
+        2
+      ],
+      "0.03": [
+        4,
+        4
+      ],
+      "0.05": [
+        7,
+        7
+      ]
+    },
+    "kept_min": {
+      "0.015": 0.79,
+      "0.03": 0.68,
+      "0.04": 0.66,
+      "0.05": 0.64,
+      "0.12": 0.58
+    },
+    "raw_sweep": {
+      "date": "2026-11-03",
+      "kept_min": {
+        "0.015": 0.76,
+        "0.03": 0.73,
+        "0.05": 0.62,
+        "0.12": 0.51
+      }
+    }
+  },
+  "bigaug_gamma": {
+    "range": [
+      0.68,
+      1.79
+    ],
+    "previous": [
+      0.71,
+      1.77
+    ],
+    "date": "2026-11-04",
+    "source": "processed",
+    "sweep_sites": [
+      "R015",
+      "R029",
+      "R014",
+      "R030",
+      "R039",
+      "R040"
+    ],
+    "gammas": [
+      0.5,
+      0.6,
+      0.68,
+      0.85,
+      1.0,
+      1.4,
+      1.79,
+      1.85,
+      2.5,
+      3.5,
+      4.5
+    ],
+    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 9 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux"
+  },
+  "fold_references": [
+    {
+      "fold": 0,
+      "site": "R059",
+      "n_subjects": 733,
+      "validation_centers": [
+        "R009",
+        "R010",
+        "R014",
+        "R016",
+        "R035",
+        "R057",
+        "R058",
+        "R063",
+        "R065"
+      ],
+      "ranking": [
+        {
+          "site": "R059",
+          "n": 30,
+          "w1": 0.0103
+        },
+        {
+          "site": "R071",
+          "n": 21,
+          "w1": 0.0191
+        },
+        {
+          "site": "R004",
+          "n": 30,
+          "w1": 0.0207
+        },
+        {
+          "site": "R011",
+          "n": 23,
+          "w1": 0.0225
+        }
+      ]
+    },
+    {
+      "fold": 1,
+      "site": "R071",
+      "n_subjects": 733,
+      "validation_centers": [
+        "R015",
+        "R018",
+        "R020",
+        "R023",
+        "R038",
+        "R042",
+        "R056",
+        "R067",
+        "R070"
+      ],
+      "ranking": [
+        {
+          "site": "R071",
+          "n": 21,
+          "w1": 0.0052
+        },
+        {
+          "site": "R004",
+          "n": 30,
+          "w1": 0.0092
+        },
+        {
+          "site": "R011",
+          "n": 23,
+          "w1": 0.0107
+        },
+        {
+          "site": "R052",
+          "n": 26,
+          "w1": 0.012
+        }
+      ]
+    },
+    {
+      "fold": 2,
+      "site": "R059",
+      "n_subjects": 732,
+      "validation_centers": [
+        "R005",
+        "R017",
+        "R024",
+        "R029",
+        "R040",
+        "R045",
+        "R052",
+        "R061",
+        "R062"
+      ],
+      "ranking": [
+        {
+          "site": "R059",
+          "n": 30,
+          "w1": 0.0093
+        },
+        {
+          "site": "R010",
+          "n": 21,
+          "w1": 0.0152
+        },
+        {
+          "site": "R071",
+          "n": 21,
+          "w1": 0.0212
+        },
+        {
+          "site": "R004",
+          "n": 30,
+          "w1": 0.0229
+        }
+      ]
+    },
+    {
+      "fold": 3,
+      "site": "R004",
+      "n_subjects": 733,
+      "validation_centers": [
+        "R001",
+        "R002",
+        "R011",
+        "R019",
+        "R030",
+        "R041",
+        "R047",
+        "R059",
+        "R064",
+        "R071"
+      ],
+      "ranking": [
+        {
+          "site": "R004",
+          "n": 30,
+          "w1": 0.0154
+        },
+        {
+          "site": "R010",
+          "n": 21,
+          "w1": 0.0181
+        },
+        {
+          "site": "R052",
+          "n": 26,
+          "w1": 0.019
+        },
+        {
+          "site": "R009",
+          "n": 89,
+          "w1": 0.0314
+        }
+      ]
+    },
+    {
+      "fold": 4,
+      "site": "R071",
+      "n_subjects": 733,
+      "validation_centers": [
+        "R003",
+        "R004",
+        "R027",
+        "R033",
+        "R039",
+        "R044",
+        "R046",
+        "R048",
+        "R049",
+        "R050",
+        "R069"
+      ],
+      "ranking": [
+        {
+          "site": "R071",
+          "n": 21,
+          "w1": 0.0072
+        },
+        {
+          "site": "R011",
+          "n": 23,
+          "w1": 0.0118
+        },
+        {
+          "site": "R059",
+          "n": 30,
+          "w1": 0.0119
+        },
+        {
+          "site": "R052",
+          "n": 26,
+          "w1": 0.0135
+        }
+      ]
+    }
+  ]
+}

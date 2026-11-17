@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-13",
+  "source": "data/processed/subjects.parquet",
+  "source_sha256": "173949eb3111b072b826bbb222634f12145b11943c4248dbd06c7d3bf0827641",
+  "centers_inventoried": 55,
+  "centers_retained": 54,
+  "centers_without_valid_delay_among_retained": 8,
+  "counts": {
+    "inventoried": 1453,
+    "retained": 1415,
+    "excluded": 38,
+    "errors": 0,
+    "empty_masks": 5,
+    "nonempty_masks": 1410,
+    "mask_status_unknown": 0,
+    "delay_available": 1073,
+    "delay_missing_or_invalid": 342,
+    "chronicity_flag_present": 296,
+    "chronicity_unspecified": 1119,
+    "metadata_warning_cases": 2
+  },
+  "denominators": {
+    "statuses": "Tous les sujets inventoriés dans la table de prétraitement.",
+    "masks_and_metadata": "Sujets status=ok uniquement ; les exclusions ne sont pas comptées comme métadonnées manquantes.",
+    "delay_rate": "Nombre de délais absents, non numériques, non finis ou négatifs / sujets retenus du centre ; non défini si aucun retenu."
+  },
+  "limits": [
+    "CHRONICITY non renseigné ne signifie pas aigu, chronique ou absence de maladie.",
+    "Un masque vide est conservé comme cas négatif ; il ne constitue pas automatiquement une anomalie.",
+    "Un centre sans sujet retenu a des taux non définis, pas des taux nuls.",
+    "Le tableau résume les contrôles existants ; aucune nouvelle exclusion ni validation anatomique."
+  ]
+}

@@ -1,11 +1,11 @@
 {
-  "date": "2026-11-04",
+  "date": "2026-11-12",
   "source": "processed",
   "splits": {
     "file": "splits.json",
-    "version": 1,
+    "version": 2,
     "seed": 2026,
-    "sha256_16": "cc01a2522a90fd55"
+    "sha256_16": "c5fbf3ae1185f42d"
   },
   "held_out_sites": [
     "R008",
@@ -205,6 +205,11 @@
         "0.05": 0.62,
         "0.12": 0.51
       }
+    },
+    "sweep_provenance": {
+      "split_version": 1,
+      "sha256_16": "cc01a2522a90fd55",
+      "status": "historical_sweep_not_rerun"
     }
   },
   "bigaug_gamma": {
@@ -239,7 +244,12 @@
       3.5,
       4.5
     ],
-    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 9 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux"
+    "criteria": "plage calibrée de intensity.yaml ; à 2,5, 9 à 13 % du cerveau au noir (48 % à R030), à 0,5 contraste divisé par deux",
+    "sweep_provenance": {
+      "split_version": 1,
+      "sha256_16": "cc01a2522a90fd55",
+      "status": "historical_sweep_not_rerun"
+    }
   },
   "fold_references": [
     {

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVC · Vue 3D locale</title>
+<style>body{margin:0;background:#102827;color:#edf6f4;font:16px system-ui}header{padding:20px}button,input{margin:8px;padding:10px}canvas{width:100%;height:72vh}#status{color:#ffc988}</style>
+<header><h1>AVC · Vue 3D</h1><p>Chargez l’IRM puis son masque sur la même grille. Lecture locale dans votre navigateur.</p>
+<label>IRM <input id="image" type="file" accept=".nii,.gz"></label><label>Masque <input id="mask" type="file" accept=".nii,.gz"></label>
+<button id="load">Afficher</button><button id="mode">Coupes / 3D</button><p id="status">Initialisation…</p></header>
+<canvas id="view"></canvas>
+<script type="module">
+const status=document.getElementById('status');
+try {
+ const {esm}=await import('./vendor/niivue.es.js');
+ const {Niivue}=await import('data:text/javascript;charset=utf-8,'+esm);
+ const nv=new Niivue({backColor:[.04,.1,.1,1]}); await nv.attachTo('view');
+ status.textContent='Prêt. Les fichiers ne sont pas envoyés à un serveur.';
+ let urls=[], render=false;
+ document.getElementById('load').onclick=async()=>{
+  const image=document.getElementById('image').files[0], mask=document.getElementById('mask').files[0];
+  if(!image){status.textContent='Choisissez une IRM.';return;}
+  try {
+   urls.forEach(URL.revokeObjectURL); urls=[];
+   const volume=(file,options={})=>{const url=URL.createObjectURL(file);urls.push(url);return {url,name:file.name,...options};};
+   const volumes=[volume(image)]; if(mask)volumes.push(volume(mask,{colormap:'red',opacity:.6}));
+   await nv.loadVolumes(volumes);status.textContent='Chargé. Vérifiez visuellement l’alignement du masque.';
+  }catch(error){status.textContent=String(error);}
+ };
+ document.getElementById('mode').onclick=()=>{render=!render;nv.setSliceType(render?nv.sliceTypeRender:nv.sliceTypeMultiplanar);};
+}catch(error){status.textContent='NiiVue indisponible. Installez le fichier local indiqué dans demo/README.md. '+error;}
+</script></html>

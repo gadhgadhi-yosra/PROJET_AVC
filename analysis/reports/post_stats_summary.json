@@ -1,32 +1,33 @@
 {
-  "date": "2026-11-02",
-  "subjects": 1402,
+  "date": "2026-11-11",
+  "subjects": 1415,
   "sites": 54,
   "read_errors": 0,
-  "seconds": 289.01842566499545,
-  "subjects_not_processed": 14,
+  "seconds": 0.0,
+  "measurements_reused": true,
+  "subjects_not_processed": 0,
   "eta_squared": {
-    "raw_mean": 0.5198302478579065,
-    "log_raw_mean": 0.714325057039624,
-    "log_raw_std": 0.7136102014967756,
-    "z_p1": 0.5644784612461947,
-    "z_median": 0.7498498607835182,
-    "z_p99": 0.4289181104036084,
-    "z_skew": 0.581501662880566
+    "raw_mean": 0.5232136569175115,
+    "log_raw_mean": 0.7171877952704074,
+    "log_raw_std": 0.7165750946762545,
+    "z_p1": 0.5662163876693278,
+    "z_median": 0.7502996489886611,
+    "z_p99": 0.4306263008288465,
+    "z_skew": 0.5826512950557086
   },
   "raw_mean_site_range": [
     19.346325058720247,
-    484481.1798592113
+    481289.9188924088
   ],
-  "relative_distance_median_before": 0.1314667780190118,
-  "relative_distance_median_after": 0.03734127185869046,
-  "spearman_wasserstein_mmd": 0.8524822695035461,
-  "spearman_before_after": 0.9030527289546716,
-  "spearman_wasserstein_n": 0.2000125184267274,
-  "spearman_mmd_n": 0.0856490778196576,
+  "relative_distance_median_before": 0.13145892291130162,
+  "relative_distance_median_after": 0.037562118630529065,
+  "spearman_wasserstein_mmd": 0.8415047795251309,
+  "spearman_before_after": 0.9020659882824545,
+  "spearman_wasserstein_n": 0.2025281943742891,
+  "spearman_mmd_n": 0.08918162480381421,
   "wasserstein_median_by_group": {
-    "ID": 0.03737060503396342,
-    "OOD": 0.09012867332534534
+    "ID": 0.037591559758197626,
+    "OOD": 0.0899521753036387
   },
   "scope": "Corrélations limitées aux centres de 5 scans ou plus"
 }

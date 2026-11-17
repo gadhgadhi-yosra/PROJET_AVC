@@ -31,6 +31,9 @@ preprocessing/run_week4.sh benchmark --repeats 1
 
 # Tests synthétiques : aucun accès aux IRM requis
 .venv-spark/bin/python -m unittest discover -s tests -v
+
+# Option N4 : expérience séparée, pas de mélange avec le jeu de référence
+preprocessing/run_week4.sh run --n4 --limit 1 --output data/validation_s4/n4 --workers 1
 ```
 
 Espace requis pour le traitement complet : environ 6,3 Gio de sorties (mesuré : 1,07 × la taille des T1 d’entrée) ; le script vérifie 1,3 × l’entrée + 2 Gio de réserve, soit environ 9,6 Gio libres. L’export utilise des liens physiques et n’ajoute presque rien sur le même disque.
@@ -39,12 +42,18 @@ Pour un disque externe : `--output /Volumes/NOM/atlas_processed`, puis `export -
 
 ## Traitement et contrôle qualité
 
+L’option `--n4`, inactive par défaut, corrige le biais via ANTsPy dans le support cérébral,
+avant rééchantillonnage et z-score. Le passage RAS → LPS respecte l’origine, l’espacement
+et la direction. Son activation fait partie de la signature de reprise. Réserver un dossier
+distinct et garder le même choix N4 pour tous les modèles d’une expérience. Le QC brut
+(`--qc-only`) ne doit pas être combiné avec N4.
+
 1. Vérifier les dimensions, les grilles image/masque, l’affine, les valeurs finies et les valeurs binaires des masques (tolérance aux arrondis proches de 1).
 2. Exclure R032, dont l’espacement est suspect. Les fichiers corrompus et paires manquantes produisent un statut `error` ; les erreurs n’arrêtent pas les autres sujets, mais le programme renvoie un code d’échec à la fin.
 3. Détecter la valeur de fond par le mode d’un sous-échantillonnage régulier de l’image ; définir le cerveau par `intensité > fond`, y compris pour R029. Cette règle est héritée de l’exploration et reste à inspecter visuellement sur les cas atypiques.
 4. Réorienter RAS et rééchantillonner à 1 mm : interpolation linéaire de l’image, plus proche voisin des masques cérébraux et lésionnels. La lésion est seuillée à `> 0.5` avant interpolation.
 5. Calculer la moyenne et l’écart-type uniquement dans le masque cérébral rééchantillonné. Appliquer le z-score dans ce masque et mettre le fond à zéro. Aucun paramètre n’est appris sur les centres de test. Le z-score est stocké en `int16` avec `scl_slope = 0,001` (erreur ≤ 0,0005 écart-type, plage ±32,7) : environ deux fois moins d’espace qu’en `float32`. Une valeur hors plage fait échouer le sujet au lieu d’être tronquée ; nibabel et SimpleITK (nnU-Net) relisent directement des valeurs flottantes.
-6. Recadrer autour du cerveau avec une marge de 5 voxels. L’affine est translatée pour conserver les coordonnées physiques. Le masque lésionnel ne détermine pas la boîte de recadrage ; si une lésion serait coupée, le cas échoue explicitement et doit être examiné.
+6. Recadrer autour du cerveau avec une marge de 5 voxels. L'affine est translatée pour conserver les coordonnées physiques. Le masque lésionnel ne détermine pas la boîte de recadrage. La règle actuelle tolère la suppression d'au plus 1 % des voxels lésionnels hors boîte et consigne cette perte ; au-delà, le cas échoue et doit être examiné. Cette tolérance modifie l'annotation de sortie : elle doit être explicitée et relue, sans être présentée comme une correction clinique.
 
 Une lésion non vide qui disparaîtrait après rééchantillonnage provoque une erreur. Le volume lésionnel avant/après et sa variation relative sont enregistrés. Les masques initialement vides sont conservés comme cas négatifs et signalés par `empty_mask`. Les métadonnées vides restent des avertissements et n’empêchent pas l’utilisation d’une paire valide. Les délais négatifs/non finis sont signalés ; les valeurs manquantes ne sont pas imputées. CHRONICITY reste un drapeau, pas un stade clinique.
 
@@ -87,3 +96,12 @@ Un seul essai sur 8 sujets est un benchmark pilote, pas une estimation du temps 
 Les volumes de plus de 40 millions de voxels sont exécutés dans une partition séquentielle, après les autres sujets, pour limiter la pression mémoire. Le contrôle des valeurs des masques utilise des tranches plutôt que plusieurs tableaux temporaires complets. Le pilote de benchmark sélectionne des volumes de moins de 20 millions de voxels : son accélération ne représente donc pas celle des très gros volumes.
 
 Le QC sauvegarde également ses résultats par sujet dans `_qc_cache/` pour reprendre les prochains lancements après une interruption. La reprise vérifie les entrées et les métadonnées utilisées ; les erreurs sont retentées.
+
+## Livraison v2
+
+Le split actif retire uniquement `R065_sub-r065s019_ses-1` (quarantaine QC), en plus
+des 37 exclusions R032. Le split v1 est archivé dans `docs/yosra/releases/`.
+Les 1 415 cas restants sont validés et exportés : 916 train/val, 231 ID, 268 OOD.
+`preprocessing/qc_exclusions.json` est appliqué par défaut aux relances du traitement.
+Les bruts restent intacts. La décision technique doit être relue avec l’équipe.
+Provenance : `preprocessing/reports/release_v2.json` ; remise : `docs/yosra/REMISE_EQUIPE.md`.
