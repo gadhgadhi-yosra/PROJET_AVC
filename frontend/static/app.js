@@ -39,7 +39,7 @@
       cache[path] = fetch(path).then((r) => {
         if (!r.ok) throw new Error(`${path} : HTTP ${r.status}`);
         return r.json();
-      });
+      }).catch((e) => { delete cache[path]; throw e; }); // un échec n'est pas mis en cache : nouvel essai au prochain affichage
     }
     return cache[path];
   }
@@ -53,8 +53,8 @@
       <span class="hint">${hint || ''}</span></div>`;
   };
   const OWNERS = {
-    yosra: ['Ma partie · Yosra', 'violet'], anas: ['Équipe · Anas', 'id'], fayfa: ['Équipe · Fayfa', 'ood'],
-    equipe: ['Équipe', ''], mixte: ['Équipe + ma partie', 'warn'], projet: ['Projet complet', ''],
+    pipeline: ['Données et analyses', 'violet'], anas: ['Équipe · Anas', 'id'], fayfa: ['Équipe · Fayfa', 'ood'],
+    equipe: ['Équipe', ''], mixte: ['Intégration des modules', 'warn'], projet: ['Projet complet', ''],
   };
   const ownerChip = (who) => { const [label, kind] = OWNERS[who] || [who, '']; return `<span class="badge owner-chip ${kind}">${label}</span>`; };
   const own = (who, title) => `${title}${ownerChip(who)}`;
@@ -164,7 +164,7 @@
     });
   }
 
-  /* ---------- Ma contribution ---------- */
+  /* ---------- Données et analyses ---------- */
   const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
   async function contribution() {
     const d = await api('/api/contribution');
@@ -184,7 +184,7 @@
       </div>
       ${card('Mon parcours semaine par semaine', `<ol class="weeks">${d.weeks.map((w) => `
         <li><a class="wk" href="#${links[w.weeks] || 'accueil'}">${esc(w.weeks)}</a><p>${md(w.text)}</p></li>`).join('')}</ol>`,
-        'repris de docs/yosra/SUIVI_SEMAINES.md', P.violet)}
+        'repris de docs/pipeline/SUIVI_SEMAINES.md', P.violet)}
       ${card('Ce qui vient de l’équipe', `<ul class="todo">${d.team.map((t) =>
         `<li><span>${ownerChip(t.who === 'Anas' ? 'anas' : t.who === 'Fayfa' ? 'fayfa' : 'equipe')}</span><span>${esc(t.what)}</span><a class="more" href="#${t.page}">voir →</a></li>`).join('')}</ul>`,
         'intégré et présenté, mais pas réalisé par moi', P.blue)}`;
@@ -337,7 +337,7 @@
       ${card(own('anas', 'Dice par modèle : centres connus (ID) vs inconnus (OOD)'), '<div id="dice"></div>', `${m[0]?.n_ID ?? '—'} cas ID · ${m[0]?.n_OOD ?? '—'} cas OOD`, P.pink)}
       <div class="grid g2">
         ${card(own('anas', 'Écart de Dice ID − OOD (IC 95 %)'), '<div id="gap"></div>', 'Négatif = meilleur sur OOD', P.violet)}
-        ${card(own('yosra', 'Le délai depuis l’AVC explique-t-il le Dice ?'), `<div id="r2"></div>
+        ${card(own('pipeline', 'Le délai depuis l’AVC explique-t-il le Dice ?'), `<div id="r2"></div>
           <div class="metric-row" style="margin-top:18px">
             <div class="metric tint" style="${g(ID)}"><b>${fmt(t.ID.incremental_r2_time, 4)}</b><span>ID · R² ajouté par le temps (p = ${fmt(t.ID.permutation_p_time_given_center, 3)})</span></div>
             <div class="metric tint" style="${g(OOD)}"><b>${fmt(t.OOD.incremental_r2_time, 3)}</b><span>OOD · R² ajouté par le temps (p = ${fmt(t.OOD.permutation_p_time_given_center, 3)})</span></div>
@@ -381,7 +381,7 @@
     const v = d.verification, exp = Object.entries(d.readiness?.experiments || {});
     content.innerHTML = `
       <div class="grid g4">
-        ${kpi('Tests Yosra', v.yosra_tests.passed, 'pipeline et analyses', 'check', P.violet)}
+        ${kpi('Tests du pipeline', v.pipeline_tests.passed, 'pipeline et analyses', 'check', P.violet)}
         ${kpi('Généralisation + adaptation', v.generalization_adaptation_without_calibration.passed, 'tests, dont vrais patches C1', 'layers', P.cyan)}
         ${kpi('Tests calibration', v.calibration_tests.passed, 'recalculée sur 916 sujets C1', 'target', P.amber)}
         ${kpi('Total', v.total_passed, v.status === 'passed' ? 'tous réussis ✓' : v.status, 'zap', P.green)}
@@ -399,7 +399,7 @@
       <div class="grid g2">
         ${card(own('fayfa', 'Centres tenus à l’écart (OOD)'), `<div class="checks">${d.held_out_sites.map((s) => badge(s, 'ood')).join('')}</div>
           <p class="muted">${d.training_sites} centres d’entraînement · split v${d.splits?.version} · empreinte ${esc(d.splits?.sha256_16 || '')}</p>`, '', P.orange)}
-        ${card(own('yosra', 'État de l’intégration'), `
+        ${card(own('pipeline', 'État de l’intégration'), `
           <dl class="kv">
             <dt>Branches fusionnées</dt><dd>${Object.keys(v.branches).map((b) => badge(b, 'violet')).join(' ')}</dd>
             <dt>Calibration</dt><dd>recalculée sur le split v${v.calibration.split_version}</dd>
@@ -408,7 +408,7 @@
           </dl>`, '', P.violet)}
       </div>
       ${resultsCard(d)}
-      ${card(own('yosra', 'Expériences restantes (C1 v2)'), `
+      ${card(own('pipeline', 'Expériences restantes (C1 v2)'), `
         <div class="checks">${exp.map(([k, e]) => badge(`${k.replace('baseline_fold_', 'Pli ')} : ${e.status === 'missing' ? 'en attente' : e.status}`, e.status === 'missing' ? 'warn' : 'ok')).join('')}</div>
         <p class="callout warn">${esc(d.readiness?.scope || '')}. Aucun Dice DANN/TENT n’est affiché tant que les poids entraînés ne sont pas fournis.</p>`, '', P.amber)}`;
   }
@@ -669,13 +669,13 @@
   /* ---------- Routage ---------- */
   const pages = {
     accueil: ['Projet AVC', 'Vue d’ensemble', accueil, 'Le projet en un coup d’œil : données, résultats clés et parcours.', 'projet'],
-    contribution: ['Yosra', 'Ma contribution', contribution, 'Ce que j’ai réalisé dans le projet, semaine par semaine.', 'yosra'],
-    qc: ['S1–S2 · Exploration', 'Données & contrôle qualité', qc, 'Ce que contient la cohorte et ce qui a été écarté, centre par centre.', 'yosra'],
-    pretraitement: ['S3–S4 · Pipeline', 'Prétraitement distribué', pretraitement, 'De l’IRM brute au volume normalisé, avec Spark.', 'yosra'],
-    shift: ['S5–S6 · Analyse', 'Domain shift entre centres', shift, 'À quel point les centres diffèrent, avant et après normalisation.', 'yosra'],
+    contribution: ['Pipeline', 'Données et analyses', contribution, 'Avancement du pipeline et des analyses, semaine par semaine.', 'pipeline'],
+    qc: ['S1–S2 · Exploration', 'Données & contrôle qualité', qc, 'Ce que contient la cohorte et ce qui a été écarté, centre par centre.', 'pipeline'],
+    pretraitement: ['S3–S4 · Pipeline', 'Prétraitement distribué', pretraitement, 'De l’IRM brute au volume normalisé, avec Spark.', 'pipeline'],
+    shift: ['S5–S6 · Analyse', 'Domain shift entre centres', shift, 'À quel point les centres diffèrent, avant et après normalisation.', 'pipeline'],
     modeles: ['S7–S10 · Évaluation', 'Modèles & Dice', modeles, 'Performances des baselines sur les centres connus et inconnus.', 'mixte'],
     adaptation: ['S11–S12 · Généralisation', 'Adaptation de domaine', adaptation, 'DANN et TENT : prêts, testés, en attente des poids entraînés.', 'mixte'],
-    demo: ['S12–S14 · Démo', 'Démo IRM', demo, 'Chargez une IRM et son masque pour obtenir coupes, volume et vue 3D.', 'yosra'],
+    demo: ['S12–S14 · Démo', 'Démo IRM', demo, 'Chargez une IRM et son masque pour obtenir coupes, volume et vue 3D.', 'pipeline'],
     conclusions: ['Synthèse', 'Conclusions', conclusions, 'Les messages clés du projet et ce qui reste à faire.', 'projet'],
     galerie: ['Figures', 'Galerie des figures', galerie, 'Toutes les figures du projet, cliquez pour agrandir.', 'projet'],
   };
@@ -718,6 +718,13 @@
   $('#lightbox').addEventListener('click', (e) => { e.currentTarget.hidden = true; });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#lightbox').hidden = true; closeMenu(); closeDrawer(); } });
   window.addEventListener('hashchange', () => { closeDrawer(); route(); });
+
+  // Carte latérale : chiffres lus dans les rapports, jamais écrits en dur
+  api('/api/overview').then((d) => {
+    const n = d.counts && d.counts.retained, k = d.centers && d.centers.retained;
+    if (n == null || k == null) return;
+    $('#sidebar-card').innerHTML = `<b>${fmt(n, 0)} IRM</b><span>${fmt(k, 0)} centres · split v2</span>`;
+  }).catch(() => { /* la carte garde son texte neutre */ });
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-site]');
     if (el) openCenter(el.getAttribute('data-site'));

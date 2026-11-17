@@ -270,8 +270,8 @@ def conclusions():
     ))
 
 
-def weekly_plan(relative='docs/yosra/SUIVI_SEMAINES.md'):
-    """Lignes « | Semaines | Livrables | » du suivi de Yosra, texte inchangé."""
+def weekly_plan(relative='docs/pipeline/SUIVI_SEMAINES.md'):
+    """Lignes « | Semaines | Livrables | » du suivi du pipeline, texte inchangé."""
     path = ROOT / relative
     if not path.exists():
         return []
@@ -290,7 +290,7 @@ def contribution():
     fp = read_json('analysis/reports/s6_uncertainty/summary.json') or {}
     return respond(dict(
         weeks=weekly_plan(),
-        tests=(verification.get('yosra_tests') or {}).get('passed'),
+        tests=(verification.get('pipeline_tests') or {}).get('passed'),
         counts=qc.get('counts', {}), centers=qc.get('centers_retained'),
         fingerprint_scans=fp.get('scans'),
         team=[
