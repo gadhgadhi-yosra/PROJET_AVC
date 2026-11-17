@@ -150,6 +150,12 @@ tent.reset()                                                  # retour exact à 
 
 > **Hypothèse forte : le réseau doit avoir des normalisations affines.** Le `UNet` MONAI par défaut utilise `InstanceNorm3d` **sans** paramètres affines : TENT n'aurait rien à adapter, et `configure_tent` lève une erreur claire. La boucle C4 doit utiliser `norm=("instance", {"affine": True})` (comme nnU-Net), BatchNorm ou GroupNorm. À convenir avec Anas.
 
+## Démo (contrat C8)
+
+- Brancher le modèle sur la démo (`demo/app.py`) : `AVC_PREDICT_ADAPTER=adaptation.demo_adapter:predict`, lancé depuis la racine du dépôt (le module `adaptation` doit être importable).
+- Checkpoint : `data/modeles/unet3d_intensity_pli0_best.pt` (ignoré par Git), ou un autre chemin dans `PROJET_AVC_MODELE`.
+- Le masque est écrit en NIfTI uint8 dans la grille de l'IRM reçue, dans `AVC_MASK_DIR` s'il est défini, sinon dans un dossier temporaire.
+
 ## Vérification
 
 24 tests dans `adaptation/tests`, environ 25 secondes sur CPU (petits UNet MONAI 3D, volumes de 32³) :
