@@ -1,4 +1,4 @@
-"""La voie locale de Fayfa respecte les exclusions du pipeline C1 de Yosra."""
+"""La voie locale de Fayfa respecte les exclusions du pipeline C1 du pipeline."""
 import json
 from pathlib import Path
 import tempfile
