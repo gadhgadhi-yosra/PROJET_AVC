@@ -1,4 +1,4 @@
-"""Audit de raccordement C1 Pipeline / chargeur Fayfa / résultats historiques baselines."""
+"""Audit de raccordement C1 (pipeline) / chargeur Fayfa / résultats historiques baselines."""
 import hashlib
 import json
 from pathlib import Path

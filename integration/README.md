@@ -74,6 +74,14 @@ leur provenance v1 ; elles ne sont pas présentées comme un nouveau balayage v2
 Le pilote `generalization/preprocess_c1_local.py` applique maintenant aussi
 `preprocessing/qc_exclusions.json`, comme le pipeline Spark.
 
+## Vérification du 18 novembre 2026
+
+Après fusion des PR #6 à #10 dans `main` : **310 tests réussis** (50 pipeline, 7 frontend,
+224 généralisation/adaptation dont les patches C1 réels, 29 calibration). Sur ce Mac Intel,
+14 tests d'entraînement (`adaptation/tests/test_train.py`, `test_continual.py`) échouent car
+`torch.amp.GradScaler` n'existe pas dans torch 2.2.2, dernière version disponible pour macOS Intel.
+L'entraînement tourne sur Kaggle ; l'inférence du checkpoint C8 est vérifiée localement.
+
 ## Vérification finale du 12 novembre 2026
 
 **242 tests réussis** : 34 pour le pipeline, 179 généralisation/adaptation (dont les patches

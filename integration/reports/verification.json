@@ -1,17 +1,29 @@
 {
-  "date": "2026-11-12",
-  "merged_local_head": "7313bfd",
+  "date": "2026-11-18",
+  "merged_local_head": "880c0d8",
   "branches": {
+    "frontend": "PR #9",
+    "integration-finale": "PR #10",
+    "adaptation-entrainement": "PR #6, #7, #8",
     "generalisation-chargeur-c1": "214647d",
     "adaptation-dann": "d0a9a93",
     "adaptation-tent": "5834f0e"
   },
   "pipeline_tests": {
-    "passed": 34
+    "passed": 50,
+    "environment": ".venv-spark"
+  },
+  "frontend_tests": {
+    "passed": 7,
+    "environment": ".venv-demo"
   },
   "generalization_adaptation_without_calibration": {
-    "passed": 179,
-    "real_c1_tests_included": true
+    "passed": 224,
+    "failed": 12,
+    "errors": 2,
+    "real_c1_tests_included": true,
+    "environment": ".venv-integration (macOS Intel, torch 2.2.2, monai 1.3.2)",
+    "failures_cause": "adaptation/tests/test_train.py et test_continual.py : torch.amp.GradScaler absent de torch 2.2.2 (dernière version pour macOS Intel). Entraînement seulement, exécuté sur Kaggle ; inférence vérifiée localement."
   },
   "loader_audit": "team_compatibility.json",
   "calibration": {
@@ -21,11 +33,15 @@
     "manual_sweeps": "historical_v1_provenance_retained"
   },
   "pip_check": "passed",
-  "trained_checkpoints_present": false,
-  "push_performed": false,
+  "trained_checkpoints_present": true,
+  "checkpoints": {
+    "data/modeles/unet3d_intensity_pli0_best.pt": "ee6b93af5d463cd9cc85fe80ae1b290b0b7ef9e0a41f3ea63ca346a75287abb6"
+  },
+  "push_performed": true,
   "calibration_tests": {
     "passed": 29
   },
-  "total_passed": 242,
-  "status": "passed"
+  "total_passed": 310,
+  "total_failed": 14,
+  "status": "passed_except_training_tests_on_local_torch"
 }

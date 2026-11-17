@@ -85,7 +85,7 @@ Pour le tableau d'ablation, plusieurs configurations se combinent : `build_trans
 
 ## Données prétraitées (contrat C1)
 
-`load_processed(root, split="train", fold=None)` lit la sortie de `preprocessing/week4.py` (Pipeline) : `<root>/<sujet>/{t1,mask,brain}.nii.gz`, `qc.json` et la table `<root>/subjects.parquet` (statut `ok` seulement). Elle renvoie une liste de `torchio.Subject` avec les clés `t1`, `mask`, `brain`, `site`, `subject`, `case_id`, `empty_mask`, `norm_mean` et `norm_std`.
+`load_processed(root, split="train", fold=None)` lit la sortie de `preprocessing/week4.py` (pipeline C1) : `<root>/<sujet>/{t1,mask,brain}.nii.gz`, `qc.json` et la table `<root>/subjects.parquet` (statut `ok` seulement). Elle renvoie une liste de `torchio.Subject` avec les clés `t1`, `mask`, `brain`, `site`, `subject`, `case_id`, `empty_mask`, `norm_mean` et `norm_std`.
 
 - **Découpages** : `split` vaut `"train"`, `"id_test"` ou `"ood_test"` ; avec `fold=k`, `"train"` et `"val"` sont ceux du pli k et `"id_test"` le test ID du pli. `split="val"` sans pli est refusé.
 - **Lecture** : nibabel, à la demande (les volumes ne sont lus qu'à `subject["t1"].data`) ; les sujets sont sérialisables pour les `DataLoader`. Le z-score stocké en int16 avec `scl_slope = 0,001` est relu en float32.

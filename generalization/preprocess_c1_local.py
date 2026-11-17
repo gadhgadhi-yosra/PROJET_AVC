@@ -33,7 +33,7 @@ import week4  # noqa: E402
 
 
 def partition_quarantine(rows, policy_path):
-    """Applique la même quarantaine versionnée que le pipeline Spark du pipeline."""
+    """Applique la même quarantaine versionnée que le pipeline Spark S4."""
     policy = json.loads(Path(policy_path).read_text())
     reasons = {item['case_id']: item['reason'] for item in policy['cases']}
     active, excluded = [], []
