@@ -14,6 +14,13 @@ GRADIO_ANALYTICS_ENABLED=False .venv-demo/bin/python frontend/server.py
 Ouvrir http://127.0.0.1:8000. L'API JSON est documentée sur `/api/docs`.
 Variables facultatives : `AVC_PORT`, `AVC_HOST`, `AVC_PREDICT_ADAPTER` (modèle de l'équipe).
 
+Pour segmenter une IRM sans masque avec le modèle final C8 (checkpoint dans `data/modeles/`,
+voir `demo/README.md`) :
+
+```sh
+AVC_PREDICT_ADAPTER=c8_bridge:predict GRADIO_ANALYTICS_ENABLED=False .venv-demo/bin/python frontend/server.py
+```
+
 ## Principes
 
 - Les chiffres viennent **uniquement** des rapports versionnés (`analysis/reports`,

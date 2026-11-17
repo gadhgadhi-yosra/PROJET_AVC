@@ -13,6 +13,24 @@ grille, ou configurer `AVC_PREDICT_ADAPTER=equipe.modele:predict` avant le lance
 Le modèle doit renvoyer `mask_path` et éventuellement `uncertainty_path`, dans la grille
 native de l’IRM reçue. Le serveur ne télécharge ni n’exécute un checkpoint fourni via l’interface.
 
+### Modèle final C8 de l’équipe
+
+Le modèle de Fayfa (`adaptation/demo_adapter.py`, U-Net 3D « intensité », pli 0) demande
+PyTorch et MONAI, absents de `.venv-demo`. Le pont `demo/c8_bridge.py` le lance dans
+`.venv-integration` et récupère le masque, sans mélanger les environnements :
+
+```sh
+# checkpoint partagé par l’équipe (Drive), jamais versionné : data/modeles/ est ignoré par Git
+ls data/modeles/unet3d_intensity_pli0_best.pt
+AVC_PREDICT_ADAPTER=c8_bridge:predict GRADIO_ANALYTICS_ENABLED=False .venv-demo/bin/python demo/app.py
+```
+
+Vérifié le 17 novembre 2026 sur `sub-r031s006` (centre OOD R031) : Dice 0,745, volume prédit
+33,8 mL pour 27,7 mL annotés, environ 35 s sur le CPU du Mac. Checkpoint SHA-256
+`ee6b93af5d463cd9cc85fe80ae1b290b0b7ef9e0a41f3ea63ca346a75287abb6`. Un seul cas : ce n’est
+pas une évaluation. Le modèle ne produit pas de carte d’incertitude.
+Variables facultatives : `AVC_C8_PYTHON`, `PROJET_AVC_MODELE`, `AVC_C8_TIMEOUT`.
+
 Le rapport précise s’il s’agit d’un masque fourni ou d’une prédiction. Il donne le volume
 en mL (déterminant de l’affine / 1000), les régions si un atlas est disponible, et les
 moyennes d’incertitude si une carte est disponible. Un masque vide est accepté. Les
