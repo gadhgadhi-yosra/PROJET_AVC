@@ -1,12 +1,12 @@
-# Soutenance — partie Yosra
+# Soutenance — partie Pipeline
 
 Trame de huit diapositives, à intégrer au support commun. Ne présenter comme résultats
 que les valeurs présentes dans les rapports produits ; garder les analyses dépendantes
 de modèles dans une section « protocole préparé » tant que leurs expériences sont absentes.
 
-Le fichier éditable est [Soutenance_Yosra.pptx](Soutenance_Yosra.pptx).
+Le fichier éditable est [Soutenance_Projet_AVC.pptx](Soutenance_Projet_AVC.pptx).
 Pour le régénérer après mise à jour des figures : installer `python-pptx>=1,<2` dans
-`.venv-demo`, puis exécuter `.venv-demo/bin/python docs/yosra/build_slides.py`.
+`.venv-demo`, puis exécuter `.venv-demo/bin/python docs/pipeline/build_slides.py`.
 
 ## 1 — Pourquoi un nouvel hôpital peut changer le problème (40 s)
 

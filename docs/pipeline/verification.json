@@ -35,8 +35,8 @@
     "audit": "integration/reports/remaining_readiness.json",
     "status": "waiting_for_c1_results"
   },
-  "document_review": "docs/yosra/relecture.json",
-  "oral_script": "docs/yosra/SCRIPT_ORAL.md",
+  "document_review": "docs/pipeline/relecture.json",
+  "oral_script": "docs/pipeline/SCRIPT_ORAL.md",
   "collective_validation": "pending",
   "human_rehearsal": "pending",
   "s6_uncertainty": {

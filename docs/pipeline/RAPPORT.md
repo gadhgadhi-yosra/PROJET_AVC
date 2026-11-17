@@ -1,4 +1,4 @@
-# Sections de rapport — contribution de Yosra
+# Sections de rapport — contribution données et analyses
 
 Brouillon scientifique fondé sur les résultats locaux disponibles. Les valeurs finales
 doivent être prises dans les JSON/CSV générés après le dernier QC ; les expériences
@@ -15,7 +15,7 @@ et de réduire leur perte de performance.
 Trois questions structurent le projet : quel est l’écart entre test ID et test OOD ?
 Les architectures Transformer améliorent-elles la généralisation par rapport à nnU-Net ?
 Quelles techniques de généralisation ou d’adaptation réduisent cet écart ? La contribution
-de Yosra fournit le pipeline de données, les partitions communes, les mesures du décalage,
+du pipeline fournit le pipeline de données, les partitions communes, les mesures du décalage,
 les analyses explicatives et l’interface de démonstration. Les comparaisons de segmentation
 et l’adaptation continue sont produites par Fayfa et Anas.
 

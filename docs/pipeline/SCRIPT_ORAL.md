@@ -1,7 +1,7 @@
-# Script oral de Yosra — objectif 7 minutes
+# Script oral du pipeline — objectif 7 minutes
 
 Durée cible, **pas une répétition déjà effectuée**. Les huit séquences correspondent
-à `Soutenance_Yosra.pptx`. Les pauses et manipulations sont incluses dans le budget.
+à `Soutenance_Projet_AVC.pptx`. Les pauses et manipulations sont incluses dans le budget.
 Lire à voix haute et noter le temps réellement mesuré dans la fiche en fin de document.
 
 ## 1 — Rôle et question · 00:00 à 00:40

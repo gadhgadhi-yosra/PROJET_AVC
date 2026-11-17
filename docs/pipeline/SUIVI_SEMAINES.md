@@ -1,6 +1,6 @@
-# Suivi de Yosra — toutes les semaines
+# Suivi du pipeline — toutes les semaines
 
-État local au **13 novembre 2026**. Périmètre : fiche Yosra de
+État local au **13 novembre 2026**. Périmètre : volet données, prétraitement et analyses de
 `docs/Repartition_Taches_Equipe.pdf`. Les semaines futures sont préparées dès maintenant.
 
 | Semaines | Livrables et état vérifiable |
@@ -62,7 +62,7 @@ Voir [les commandes et la livraison attendue](PROCHAINE_ETAPE.md).
 Rapport et diaporama relus et harmonisés : voir [le compte rendu](RELECTURE.md).
 Le [script oral](SCRIPT_ORAL.md) vise sept minutes et prévoit le secours de démonstration.
 La [fiche de validation collective](VALIDATION_EQUIPE.md) réunit les pièces QC, atlas
-et protocole. La répétition avec Yosra et les décisions de l’équipe restent à effectuer.
+et protocole. La répétition avec l’équipe et les décisions de l’équipe restent à effectuer.
 
 ## Complément S6 ajouté
 

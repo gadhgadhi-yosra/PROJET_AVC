@@ -6,14 +6,14 @@ Les pièces sont locales ; aucune donnée ni demande n’a été envoyée automa
 | Point | Preuves à ouvrir | Décision attendue | État |
 |---|---|---|---|
 | Quarantaine du cas R065_sub-r065s019_ses-1 | `data/processed/pending_case_qc.png`, `pending_case_review.json`, `preprocessing/qc_exclusions.json` | Confirmer l’exclusion technique v2 ou définir une correction/procédure documentée ; ne pas modifier silencieusement les labels | À relire |
-| Tolérance de perte au recadrage ≤ 1 % | `preprocessing/week4.py`, QC par sujet et `docs/yosra/RAPPORT.md` | Accepter ou réviser la règle commune, avec impact sur versions et réentraînement | À relire |
+| Tolérance de perte au recadrage ≤ 1 % | `preprocessing/week4.py`, QC par sujet et `docs/pipeline/RAPPORT.md` | Accepter ou réviser la règle commune, avec impact sur versions et réentraînement | À relire |
 | Adoption de C1 v2 | `splits.json`, `preprocessing/reports/release_v2.json`, `export_v2.json` | Confirmer le split de chaque entraînement et conserver la provenance des modèles v1/historiques | À confirmer |
 | Atlas sur l’exemple réel | `data/demo/registration/qc_overlay.png`, `qc.json`, `registration.json` | Relecture anatomique compétente avant interprétation des régions ; l’accord de grille ne suffit pas | À relire |
 | Conclusions S8 | `analysis/reports/s8_historical/README.md`, `summary.json` | Vérifier l’interprétation exploratoire, le rôle du volume et les données manquantes | À relire |
-| Rapport et oral commun | `RAPPORT.md`, `Soutenance_Yosra.pptx`, `SCRIPT_ORAL.md` | Harmoniser les conclusions, les rôles et les transitions avec les autres parties | À relire |
+| Rapport et oral commun | `RAPPORT.md`, `Soutenance_Projet_AVC.pptx`, `SCRIPT_ORAL.md` | Harmoniser les conclusions, les rôles et les transitions avec les autres parties | À relire |
 
 Les chemins abrégés de la première ligne sont dans `data/processed/` ; ceux de l’atlas
-dans `data/demo/registration/`. Les documents de rapport et d’oral sont dans `docs/yosra/`.
+dans `data/demo/registration/`. Les documents de rapport et d’oral sont dans `docs/pipeline/`.
 
 ## Trace des décisions
 
