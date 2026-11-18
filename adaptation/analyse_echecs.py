@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .aggregate_rq3 import (COLORS, GRID, INK, LABELS, MUTED, SIZE_BINS, SIZE_LABELS, iter_files, load_results,
+from .aggregate_rq3 import (COLORS, FIGURE_SIZE_LABELS, GRID, INK, LABELS, MUTED, SIZE_BINS, SIZE_LABELS, iter_files, load_results,
                             save, scored, style)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -292,7 +292,7 @@ def figures(rows, centers, sizes, contrast, folder, data_root=None):
     data = sizes[sizes["split"] == "ood_test"]
     for technique in shown:
         line = data[data["technique"] == technique].set_index("taille").reindex(SIZE_LABELS)
-        ax.plot(SIZE_LABELS, line["dice"], marker="o", markersize=6, linewidth=2, color=color[technique],
+        ax.plot(FIGURE_SIZE_LABELS, line["dice"], marker="o", markersize=6, linewidth=2, color=color[technique],
                 label=TECHNIQUE_LABELS.get(technique, technique)
                 + (", sous-ensemble" if technique.startswith("continue_") else ""))
     ax.set_xlabel("Volume de la lésion (vérité terrain)")

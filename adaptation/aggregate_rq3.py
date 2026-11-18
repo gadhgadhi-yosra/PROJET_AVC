@@ -39,6 +39,8 @@ SHORT_LABELS = {"histogram_matching": "HM", "baseline+tent": "Baseline\n+ TENT"}
 COMPARISONS = [("bigaug", "intensity"), ("histogram_matching", "intensity")]
 SIZE_BINS = [0, 1, 10, 50, math.inf]  # ml
 SIZE_LABELS = ["< 1 ml", "1-10 ml", "10-50 ml", ">= 50 ml"]
+# Étiquettes des figures : unité « mL » du rapport (les CSV gardent SIZE_LABELS).
+FIGURE_SIZE_LABELS = [label.replace(" ml", " mL") for label in SIZE_LABELS]
 RESULT_FILE = re.compile(r"(^|/)resultats_(id_test|ood_test)(_tent)?\.csv$")
 SUMMARY_FILE = re.compile(r"(^|/)resume(_tent)?\.json$")
 # Palette catégorielle (ordre fixe) et teinte séquentielle des figures.
@@ -318,7 +320,7 @@ def figures(rows, table, centers, sizes, folder):
         for index, technique in enumerate(order):
             data = sizes[(sizes["technique"] == technique) & (sizes["split"] == split)]
             data = data.set_index("taille").reindex(SIZE_LABELS)
-            ax.plot(SIZE_LABELS, data["dice"], marker="o", markersize=5, linewidth=2,
+            ax.plot(FIGURE_SIZE_LABELS, data["dice"], marker="o", markersize=5, linewidth=2,
                     color=COLORS[(ORDER.index(technique) if technique in ORDER else index) % len(COLORS)], label=LABELS.get(technique, technique))
         ax.set_title("Test " + split.replace("_test", "").upper(), color=INK, loc="left")
         ax.set_xlabel("Volume de la lésion")

@@ -1,0 +1,300 @@
+% Chapitre nnU-Net 3D (contribution d'Anas), à inclure dans docs/rapport/rapport.tex par \input.
+% Traduction française fidèle de « Stroke lesion segmentation with nnU-Net 3D — final results » (18 novembre 2026) :
+% mêmes chiffres, même plan, mêmes réserves. « Hospital » est rendu par « centre », comme dans les autres chapitres.
+% Les notes de présentation ont été retirées ; le glossaire est en annexe (docs/rapport/annexe_glossaire.tex).
+% Les figures de ce rapport ne sont pas dans le dépôt : emplacements [FIGURE À FOURNIR PAR ANAS].
+
+\newcommand{\figureafournir}[1]{%
+  \fbox{\parbox{0.9\linewidth}{\centering\vspace{1.5em}\textbf{[FIGURE À FOURNIR PAR ANAS : #1]}\vspace{1.5em}}}}
+
+\chapter{Segmentation des lésions d'AVC avec nnU-Net 3D : résultats finaux}
+\label{chap:anas}
+
+\section{Résumé}
+\label{sec:anas-resume}
+
+Un nnU-Net 3D complet, entraîné pendant 8~heures sur un GPU Kaggle, atteint un \textbf{Dice de 0,61 sur de nouveaux patients de centres connus (ID) et de 0,66 sur des centres jamais vus (OOD)}, contre 0,47 / 0,53 pour notre CNN 2.5D précédent.
+
+\begin{itemize}
+  \item \textbf{Le 3D dépasse le 2.5D d'environ +0,13 de Dice}, pour toutes les tailles de lésion. Le plus grand gain concerne les lésions minuscules, de moins de 1~mL (0,20 $\rightarrow$ 0,47 en OOD).
+  \item \textbf{Le réseau plus grand n'a pas aidé.} Le Residual Encoder U-Net (102~M de paramètres) obtient le même score que le U-Net simple (31~M) : 0,59 contre 0,61 en ID, 0,66 contre 0,66 en OOD. Chacune de ses époques est 1,6 fois plus lente ; dans les mêmes 8~heures, il a donc fait 94 époques au lieu de 152.
+  \item \textbf{Pas de baisse sur les centres jamais vus.} L'OOD est même légèrement supérieur, parce que les centres OOD ont des lésions plus grandes, surtout chroniques, qui sont plus faciles. Dans chaque classe de taille de lésion, l'OOD est aussi $\geq$ ID.
+  \item \textbf{Les deux modèles sont sous-entraînés, pas sur-entraînés.} Les pertes d'entraînement et de validation restent proches, et le Dice de validation montait encore à la fin. nnU-Net s'entraîne normalement pendant 1\,000 époques ; nous en avons fait 152.
+  \item \textbf{Les cas difficiles sont les AVC aigus (< 7 jours) et les lésions minuscules} (< 1~mL) : Dice de 0,31 à 0,47. Seulement 6~\% des données sont aiguës, et la plupart viennent d'un seul centre, aux images de plus basse résolution.
+\end{itemize}
+
+\section{Données et découpage}
+\label{sec:anas-donnees}
+
+Nous utilisons \textbf{1\,416 IRM cérébrales pondérées en T1 provenant de 54 centres} (ATLAS v3 / ISLES'26), chacune avec un masque de lésion tracé par un expert.
+Le centre R032 (37 IRM) a été retiré, car les en-têtes de ses fichiers sont incohérents.
+
+Le découpage est fait \textbf{par centre}, ce qui permet de mesurer si le modèle fonctionne sur un centre qu'il n'a jamais vu (tableau~\ref{tab:anas-decoupage}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Découpage par centre utilisé pour le CNN 2.5D, les baselines ML et nnU-Net 3D.}
+  \label{tab:anas-decoupage}
+  \small
+  \begin{tabular}{lccl}
+    \toprule
+    Ensemble & Patients & Centres & Usage \\
+    \midrule
+    Entraînement & 903 & 40 & apprentissage des poids \\
+    Validation ID & 226 & les mêmes 40 & \makecell[l]{choix du modèle, premiers contrôles\\(nouveaux patients, centres connus)} \\
+    Test OOD & 287 & 14 autres & test final sur des centres jamais vus à l'entraînement \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Les 14 centres OOD ont été tirés au hasard (graine 0), avec au plus 60 patients chacun, pour qu'aucun grand centre ne forme à lui seul tout le jeu de test.
+Le découpage ID est stratifié par centre.
+Ce découpage est identique à celui utilisé pour le CNN 2.5D et les baselines ML : tous les chiffres de ce chapitre se comparent donc directement.
+
+La lésion est minuscule par rapport au cerveau : environ \textbf{1~\% des voxels du cerveau}, médiane de 3,7~mL (ID) et de 5,6~mL (OOD).
+C'est pourquoi nous mesurons le Dice (recouvrement) et non l'exactitude, qui vaudrait 99~\% pour un modèle qui ne prédit rien.
+
+\section{Prétraitement}
+\label{sec:anas-pretraitement}
+
+Le prétraitement comporte deux parties : des corrections de données écrites par nous, puis le prétraitement automatique de nnU-Net, qui s'adapte au jeu de données.
+
+\textbf{Nos corrections de données} (\nolinkurl{baselines/preprocessing/01_build_dataset.py}), identifiées pendant l'exploration des données :
+\begin{enumerate}
+  \item \textbf{Retrait du centre R032} : ses tailles de voxels sont incohérentes, et 2 IRM ne sont pas alignées avec leurs masques.
+  \item \textbf{Nettoyage du fond de R029} : il valait une petite valeur non nulle au lieu de 0, ce qui fausse le recadrage du cerveau.
+  \item \textbf{Masques strictement binaires} : 41 masques stockaient « 1 » sous la forme 0,99999998. Chaque masque est seuillé à 0,5 et enregistré avec l'en-tête exact de son T1, sans quoi le contrôle d'espacement de nnU-Net échoue.
+  \item \textbf{Sous-échantillonnage de 105 IRM de très haute résolution} (centre SOOP, voxels de 0,25~mm, jusqu'à $1\,008 \times 1\,008 \times 348$) à 1~mm, avec anti-repliement. À pleine résolution, une IRM occupe 1,3~Go de mémoire.
+  \item \textbf{Même orientation pour toutes les IRM} : toutes sont lues en orientation RAS (Right, Anterior, Superior).
+\end{enumerate}
+
+\textbf{Prétraitement automatique de nnU-Net} (\texttt{nnUNetv2\_plan\_and\_preprocess}) :
+\begin{enumerate}
+  \item \textbf{Empreinte} : nnU-Net mesure les tailles de voxels, les tailles d'image et les intensités du jeu de données, et en déduit ses réglages.
+  \item \textbf{Recadrage} de chaque IRM sur le cerveau (la région non nulle).
+  \item \textbf{Rééchantillonnage à $1 \times 1 \times 1$~mm} (l'espacement médian) : images par interpolation cubique, masques par interpolation linéaire puis seuillage.
+  \item \textbf{Normalisation des intensités} par un z-score par IRM : (valeur $-$ moyenne) / écart-type. L'IRM n'a pas d'échelle d'intensité fixe ; cette étape ramène tous les scanners à la même échelle.
+  \item \textbf{Planification du réseau} selon la mémoire du GPU : patches de $128 \times 128 \times 128$ voxels, lots de 2, 6 niveaux de résolution.
+  \item \textbf{Enregistrement} des 1\,129 cas d'entraînement sous forme de tableaux compressés : 6,5~Go, 43 minutes sur le CPU de Kaggle.
+\end{enumerate}
+
+\textbf{Où cela a tourné.} L'ordinateur portable (GPU de 4~Go, 16~Go de RAM) est trop petit pour nnU-Net 3D : son prétraitement a été interrompu faute de mémoire.
+Tout a tourné sur Kaggle, avec 2 GPU NVIDIA T4 (16~Go chacun) et des sessions gratuites de 12~h, pilotées depuis le portable par un script (\nolinkurl{kaggle/run.py}, hors du dépôt).
+Le script envoie les données, lance les tâches, rapatrie les résultats et enregistre chaque run (paramètres, courbes, métriques, modèle) dans MLflow.
+
+\section{Les deux modèles}
+\label{sec:anas-modeles}
+
+Les deux sont des U-Net 3D de même forme, planifiés par nnU-Net ; ils ne diffèrent que par le contenu de chaque niveau de l'encodeur.
+Contrairement au CNN 2.5D, ils voient l'IRM en 3D (un cube de 12,8~cm à la fois) et utilisent donc le contexte au-dessus et au-dessous de chaque coupe.
+La figure~\ref{fig:anas-architecture} résume les deux architectures.
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{schéma « Même forme en U pour les deux ; ResEnc met 3 fois plus de paramètres dans l'encodeur » (6 niveaux, de $128^3 \cdot 32$ à $4^3 \cdot 320$ caractéristiques ; U-Net simple 31~M, 152 époques en 8~h ; ResEnc U-Net 102~M, 94 époques en 8~h)}
+  \caption{U-Net 3D planifié par nnU-Net pour nos données : 6 niveaux, la taille est divisée par deux à chaque niveau. Architecture tirée du \texttt{plans.json} de chaque run (hors du dépôt) ; nombres de paramètres tirés des checkpoints enregistrés.}
+  \label{fig:anas-architecture}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{Encodeur} (à gauche) : réduit l'image niveau par niveau et extrait des caractéristiques : d'abord des contours, puis des formes, puis « ceci ressemble à une lésion ».
+  \item \textbf{Décodeur} (à droite) : agrandit à nouveau jusqu'à la taille d'origine et décide, voxel par voxel, lésion ou non. Les connexions de saut lui transmettent les détails fins que l'encodeur avait à chaque taille.
+  \item \textbf{Blocs résiduels} (ResEnc) : chaque bloc ajoute son entrée à sa sortie, si bien que l'information et les gradients peuvent passer directement. Cela permet d'entraîner correctement un encodeur bien plus profond ; c'est l'idée de ResNet.
+  \item \textbf{Commun aux deux} : normalisation d'instance et leaky ReLU après chaque convolution ; la sortie est une probabilité de lésion par voxel (softmax lésion / fond).
+\end{itemize}
+
+\section{Configuration de l'entraînement}
+\label{sec:anas-entrainement}
+
+Les deux modèles ont été entraînés avec la même recette nnU-Net, les mêmes données et le même \textbf{budget de 8~heures} ; seul le réseau diffère (tableau~\ref{tab:anas-config}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Configuration d'entraînement commune aux deux modèles.}
+  \label{tab:anas-config}
+  \small
+  \begin{tabular}{ll}
+    \toprule
+    Paramètre & Valeur \\
+    \midrule
+    Perte & \makecell[l]{perte Dice + entropie croisée, appliquée aussi à 4 résolutions\\plus basses (supervision profonde)} \\
+    Optimiseur & SGD avec moment de Nesterov 0,99, décroissance des poids $3 \times 10^{-5}$ \\
+    Taux d'apprentissage & \makecell[l]{part de 0,01 et décroît jusqu'à 0\\(polynomial : lr $\times$ (1 $-$ époque / dernière époque)$^{0,9}$)} \\
+    Époque & 250 lots d'entraînement + 50 lots de validation \\
+    Lot & \makecell[l]{2 patches de $128 \times 128 \times 128$ voxels ($12{,}8 \times 12{,}8 \times 12{,}8$~cm) ;\\1 patch sur 3 contient forcément de la lésion} \\
+    Augmentation (à la volée) & \makecell[l]{rotation, mise à l'échelle, miroir, bruit et flou gaussiens,\\luminosité, contraste, gamma, basse résolution simulée} \\
+    Précision & mixte (float16), pour tenir en mémoire et aller plus vite \\
+    Modèle conservé & le checkpoint final (nnU-Net ne fait pas d'arrêt précoce) \\
+    Inférence & \makecell[l]{fenêtre glissante sur toute l'IRM, sans augmentation miroir au test\\(environ 4 fois plus rapide)} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Le budget de temps.} nnU-Net s'entraîne normalement pendant 1\,000 époques, environ 2 jours sur une T4, mais une session Kaggle s'arrête au bout de 12~h.
+Notre entraîneur mesure la durée d'une époque après 3 époques et réduit le nombre d'époques pour tenir en 8~h ; le taux d'apprentissage décroît ainsi quand même jusqu'à 0 selon le calendrier prévu (tableau~\ref{tab:anas-durees}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Durées d'entraînement des deux modèles.}
+  \label{tab:anas-durees}
+  \small
+  \begin{tabular}{lcc}
+    \toprule
+    & U-Net & ResEnc U-Net \\
+    \midrule
+    Durée par époque & 184~s & 301~s \\
+    Époques en 8~h & 152 & 94 \\
+    \makecell[l]{Session complète (installation + entraînement\\+ validation ID + prédiction OOD)} & 8~h~17~min & 8~h~22~min \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Les deux runs ont tourné en même temps, dans deux sessions Kaggle.
+À la fin de chaque run, la validation ID (226 IRM) et la prédiction OOD (287 IRM) ont tourné en parallèle sur les deux GPU, en environ 10 minutes.
+
+\section{Résultats}
+\label{sec:anas-resultats}
+
+Le U-Net 3D de 8~heures est le meilleur modèle : \textbf{Dice de 0,606 en ID et de 0,655 en OOD}, soit +0,13 par rapport au CNN 2.5D sur les deux ensembles (IC à 95~\% : +0,11 à +0,16).
+Le test de 1,5~h montre que le gain vient du temps d'entraînement : avec seulement 26 époques, le même réseau ne faisait pas mieux que le CNN.
+La figure~\ref{fig:anas-dice} compare les modèles.
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{« 8 h de nnU-Net 3D dépassent le CNN 2.5D de +0,13 de Dice ; le ResEnc plus grand n'apporte rien » : Dice moyen par patient avec intervalle bootstrap à 95~\%, mêmes patients pour chaque modèle (CNN 2.5D, U-Net 3D test de 1,5~h, U-Net 3D 8~h, ResEnc U-Net 3D 8~h ; ID 225 patients, OOD 287 patients)}
+  \caption{Dice moyen par patient, avec intervalle bootstrap à 95~\%. Sources : métriques par cas de chaque run (\texttt{nnunet\_validation\_metrics\_cases.csv}, hors du dépôt ; CNN : \nolinkurl{baselines/outputs/fast_results/cnn_pretrained_freeze-none_cases.csv}) ; 225 patients ID et 287 patients OOD avec une lésion.}
+  \label{fig:anas-dice}
+\end{figure}
+
+Le U-Net et le ResEnc sont statistiquement à égalité : ResEnc $-$ U-Net $= -0{,}015$ de Dice en ID (Wilcoxon $p = 0{,}62$) et $+0{,}001$ en OOD (IC à 95~\% : $-0{,}008$ à $+0{,}010$).
+Chacun l'emporte sur environ la moitié des patients.
+Le U-Net trouve un peu mieux les lésions (F1 par lésion de 0,60 contre 0,55 en ID) ; le ResEnc manque certaines lésions entièrement (voir les images plus bas).
+
+Autres métriques du U-Net 8~h (ID / OOD) : distance de bord médiane HD95 de 9,5 / 5,4~mm, erreur de volume de 5,3 / 6,0~mL, F1 par lésion de 0,60 / 0,61.
+Pour le CNN 2.5D, le F1 par lésion était de 0,34 / 0,33 : le modèle 3D trouve beaucoup plus de lésions séparées.
+
+\subsection{Par taille de lésion}
+
+La taille de la lésion est le facteur qui pèse le plus sur le Dice, pour tous les modèles.
+Le modèle 3D aide surtout là où le CNN était le plus faible : les lésions minuscules, qu'un modèle 2D coupe par coupe manque facilement (figure~\ref{fig:anas-taille}).
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{« Le U-Net 3D gagne le plus sur les plus petites lésions : le Dice fait plus que doubler sous 1~mL » : Dice moyen par classe de taille de lésion, CNN 2.5D contre U-Net 3D 8~h, avec le gain (ID : $+0{,}26$, $+0{,}13$, $+0{,}07$, $+0{,}04$ ; OOD : $+0{,}27$, $+0{,}14$, $+0{,}07$, $+0{,}03$ pour $< 1$, 1--10, 10--50 et $> 50$~mL)}
+  \caption{Dice moyen par classe de taille de lésion : CNN 2.5D (réglage fin complet) contre U-Net 3D 8~h. Taille de la lésion = volume de la lésion tracée par l'expert ; métriques par cas (hors du dépôt).}
+  \label{fig:anas-taille}
+\end{figure}
+
+Le ResEnc U-Net reste à moins de 0,03 du U-Net dans chaque classe de taille.
+À noter : OOD $\geq$ ID dans chaque classe ; le score OOD plus élevé n'est donc pas seulement dû à des lésions plus grandes, et rien n'indique de baisse sur les nouveaux centres.
+
+\subsection{Par délai depuis l'AVC}
+
+Les AVC aigus sont le point faible : à moins de 7 jours, le Dice vaut 0,43 en ID et 0,32 en OOD (tableau~\ref{tab:anas-delai}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Dice du U-Net 8~h selon le stade de l'AVC (jours après l'AVC).}
+  \label{tab:anas-delai}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    Stade & Patients ID / OOD & Dice ID & Dice OOD \\
+    \midrule
+    aigu ($< 7$~j) & 12 / 26 & 0,43 & 0,32 \\
+    subaigu (7--180~j) & 67 / 8 & 0,57 & 0,75 \\
+    chronique ($> 180$~j) & 88 / 224 & 0,61 & 0,69 \\
+    inconnu & 58 / 29 & 0,68 & 0,67 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+En IRM T1, une lésion aiguë est encore œdémateuse et à peine plus sombre que le tissu sain, alors qu'une lésion chronique est une cicatrice sombre et nette.
+Les IRM aiguës sont aussi rares : 87 sur 1\,453 IRM de l'inventaire (6~\%).
+
+\subsection{Par centre}
+
+Le pire centre est \textbf{R049} (OOD, 24 patients, Dice 0,34).
+C'est le cas extrême des points précédents : 23 de ses 24 patients sont aigus, ses lésions sont petites (médiane de 0,8~mL), et ses IRM ont une résolution plus basse (coupes de 1,5~mm, voxels de 3,4~mm\textsuperscript{3} au lieu de 1~mm\textsuperscript{3}).
+En ID, \textbf{R009} (23 patients, Dice 0,41) a le même profil : lésions petites, en partie aiguës.
+Les meilleurs centres d'au moins 3 patients atteignent un Dice de 0,77 à 0,88 (R003, R004, R057) ; ils ont surtout de grandes lésions chroniques.
+
+\section{Ce que dessinent les modèles}
+\label{sec:anas-exemples}
+
+Chaque ligne correspond à un patient, montré sur la coupe axiale où la lésion de l'expert est la plus grande : l'IRM T1, le masque de l'expert, puis les masques tracés par le U-Net et par le ResEnc, avec le Dice de chacun sur toute l'IRM 3D.
+Les patients ont été choisis pour montrer des réussites et des échecs typiques.
+L'orientation des images est radiologique (la gauche du patient à droite).
+
+\textbf{Là où cela fonctionne} (figure~\ref{fig:anas-reussites}).
+\begin{itemize}
+  \item \textbf{r003s005} (centre jamais vu, AVC chronique de 162~mL) : les deux modèles suivent la lésion presque exactement, Dice de 0,92 à 0,93. Les grandes lésions chroniques sont des cicatrices sombres et nettes en T1.
+  \item \textbf{r058s059} (centre connu, 6~mL) : la lésion principale est trouvée par les deux. Les petites taches séparées du masque de l'expert sont en partie manquées, ce qui coûte du Dice (0,65 / 0,72).
+  \item \textbf{r047s015} (centre jamais vu, 0,3~mL dans le tronc cérébral) : même cette lésion minuscule est trouvée par les deux, ce que le CNN 2.5D ne savait généralement pas faire.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{exemples de réussite : r003s005 (R003, OOD, 162,0~mL ; Dice 0,92 / 0,93), r058s059 (R058, ID, 6,1~mL ; 0,65 / 0,72), r047s015 (R047, OOD, 0,3~mL ; 0,59 / 0,45) : IRM T1, masque de l'expert, U-Net, ResEnc U-Net}
+  \caption{Réussites typiques : IRM T1, masque de l'expert, masques du U-Net et du ResEnc U-Net, avec leur Dice sur toute l'IRM 3D.}
+  \label{fig:anas-reussites}
+\end{figure}
+
+\textbf{Là où cela échoue} (figure~\ref{fig:anas-echecs}).
+\begin{itemize}
+  \item \textbf{r009s040} (centre connu, 11~mL dans le cervelet) : le U-Net la trouve (0,60) ; le ResEnc la manque presque entièrement (0,02). Un exemple net de lésion entière manquée par le ResEnc.
+  \item \textbf{r047s016} (centre jamais vu, 5~mL, deux lésions) : le U-Net trouve les deux (0,76) ; le ResEnc n'en marque que de petits morceaux (0,23). Les deux marquent aussi quelques petites taches que l'expert n'a pas tracées.
+  \item \textbf{r049s010} (R049, aigu, 0,4~mL, IRM basse résolution) : les deux la manquent (Dice 0). Sur cette IRM floue, la lésion est à peine visible ; c'est l'échec typique du centre R049.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{exemples d'échec : r009s040 (R009, ID, 10,6~mL ; Dice 0,60 / 0,02), r047s016 (R047, OOD, 5,4~mL ; 0,76 / 0,23), r049s010 (R049, OOD, 0,4~mL ; 0,00 / 0,00) : IRM T1, masque de l'expert, U-Net, ResEnc U-Net}
+  \caption{Échecs typiques, présentés de la même façon.}
+  \label{fig:anas-echecs}
+\end{figure}
+
+Tous les masques ont été vérifiés : recalculer le Dice à partir des fichiers de masques redonne exactement les valeurs des tableaux.
+
+\section{Sous-apprentissage ou sur-apprentissage ?}
+\label{sec:anas-apprentissage}
+
+{\setlength{\emergencystretch}{2em}%
+\textbf{Les deux modèles sont sous-entraînés (léger sous-apprentissage), pas sur-entraînés.}
+Un sur-apprentissage se verrait par une perte de validation qui cesse de baisser puis remonte pendant que la perte d'entraînement continue de baisser.
+Ici, les deux courbes baissent ensemble jusqu'à la fin (figure~\ref{fig:anas-pertes}).\par}
+
+\begin{figure}[htbp]
+  \centering
+  \figureafournir{« Les pertes d'entraînement et de validation baissent ensemble : sous-entraîné, pas sur-entraîné » : perte nnU-Net (Dice + entropie croisée) selon les heures d'entraînement, moyenne glissante sur 9 époques, U-Net (152 époques, écart final 0,017) et ResEnc U-Net (94 époques, écart final 0,034)}
+  \caption{Pertes d'entraînement et de validation. Sources : journaux d'entraînement nnU-Net (\texttt{training\_log\_*.txt}, hors du dépôt) des runs final-unet et final-resenc ; écart = moyenne des 10 dernières époques, validation moins entraînement.}
+  \label{fig:anas-pertes}
+\end{figure}
+
+Trois signes vont dans le même sens :
+\begin{itemize}
+  \item \textbf{Écart faible.} À la fin, la perte de validation ne dépasse la perte d'entraînement que de 0,017 pour le U-Net, et de 0,034 pour le ResEnc. Le ResEnc, plus grand, commence à s'écarter un peu, ce qui est attendu avec 3 fois plus de paramètres.
+  \item \textbf{Encore en progrès.} Le pseudo-Dice de validation du U-Net est passé de 0,73 (25~\% de l'entraînement) à 0,77 (50~\%), 0,79 (75~\%) et 0,81 (10 dernières époques). Il n'avait pas atteint de plateau.
+  \item \textbf{Plus de temps a beaucoup aidé.} Le même U-Net est passé de 0,48 à 0,61 de Dice (ID) entre 26 époques (1,5~h) et 152 époques (8~h).
+\end{itemize}
+
+Le taux d'apprentissage décroît jusqu'à 0 à la fin de chaque run, par construction, ce qui aplatit aussi les courbes tout à la fin ; c'est la fin du calendrier, pas un plateau du modèle.
+Le remède est donc d'\textbf{entraîner plus longtemps}, pas d'ajouter de la régularisation.
+
+\section{Comment améliorer les modèles}
+\label{sec:anas-ameliorations}
+
+Les modèles sont limités par le \textbf{temps d'entraînement}, pas par la taille du modèle ; le premier levier est donc d'entraîner plus longtemps.
+La liste est classée par gain attendu au regard du temps GPU qu'il coûte.
+Les gains sont des estimations, non mesurées ici.
+
+\begin{enumerate}
+  \item \textbf{Entraîner le U-Net plus longtemps.} Reprendre depuis le checkpoint de 152 époques pour une ou deux sessions de 8~h de plus (le script prend déjà en charge \texttt{-{}-resume-from}). C'est le signal le plus net de nos courbes : le Dice de validation montait encore et il n'y a pas de sur-apprentissage.
+  \item \textbf{Garder le U-Net simple, pas le ResEnc}, tant que le temps est limité. Le ResEnc n'a montré son avantage, dans l'étude des auteurs de nnU-Net, qu'avec le calendrier complet de 1\,000 époques. Avec 8~h, il est 3 fois plus grand, 1,6 fois plus lent, et pas meilleur.
+  \item \textbf{Réactiver l'augmentation miroir au test} pour les prédictions finales. Elle ne coûte que du temps d'inférence (environ 40~min au lieu de 10), sans réentraînement, et apporte généralement un petit gain.
+  \item \textbf{Travailler sur les AVC aigus et les lésions minuscules}, où le Dice est le plus bas (0,31 à 0,47). Pistes : échantillonner plus souvent les IRM aiguës et les petites lésions pendant l'entraînement, et évaluer à part les IRM basse résolution de R049. En T1 seul, un AVC aigu est à peine visible ; d'autres centres utilisent pour cela l'IRM de diffusion (DWI), que ce jeu de données ne contient pas.
+  \item \textbf{Validation croisée à 5 plis et ensemble des 5 modèles} (le standard de nnU-Net). C'est plus fiable et généralement un peu meilleur, mais cela coûte 5 fois le temps GPU : environ 40~h, plus d'une semaine de quota Kaggle (30~h).
+  \item \textbf{Tester le résultat OOD avec d'autres centres réservés} (validation croisée en laissant de côté des centres). Un seul découpage peut être chanceux ; plusieurs découpages confirmeraient qu'il n'y a pas de baisse sur les nouveaux centres.
+\end{enumerate}
+
+Quota GPU utilisé cette semaine : environ 19~h sur les 30~h disponibles sur Kaggle.

@@ -22,7 +22,7 @@ Nous présentons ensuite une adaptation continue contrôlée, avant de discuter 
 \label{sec:rq3-protocole}
 
 \paragraph{Données.}
-Nous utilisons les images T1 d'ATLAS v2.0~\cite{liew2022atlas}, déjà débarrassées du crâne, après le prétraitement S4 de l'équipe : orientation RAS, rééchantillonnage à 1~mm, recadrage sur le cerveau et z-score dans le cerveau (\nolinkurl{preprocessing/week4.py}).
+Nous utilisons les images T1 d'ATLAS v3 (ISLES'26), qui reprend les sujets d'ATLAS v2.0~\cite{liew2022atlas} et en ajoute d'autres, déjà débarrassées du crâne, après le prétraitement S4 de l'équipe : orientation RAS, rééchantillonnage à 1~mm, recadrage sur le cerveau et z-score dans le cerveau (\nolinkurl{preprocessing/week4.py}).
 Le découpage est fixé dans \nolinkurl{splits.json}. Le centre R032 est exclu.
 
 \paragraph{Découpage par centre.}
@@ -46,6 +46,7 @@ Les autres centres sont répartis en cinq plis. Seul le pli~0 a été entraîné
   \end{tabular}
 \end{table}
 
+Le découpage compte 231 sujets ID au total ; pour le pli~0, le test ID n'en garde que 185, car les 46 autres appartiennent aux centres de validation de ce pli, absents de son entraînement (\nolinkurl{splits.json}, \texttt{folds[0].id\_test}).
 Le découpage de \nolinkurl{splits.json} compte 184 sujets de validation.
 L'un d'eux, le sujet r065s019 du centre R065, n'a pas de volume prétraité.
 Le prétraitement S4 l'a rejeté, car une partie de sa lésion sort du recadrage calculé sur l'image.
@@ -189,7 +190,7 @@ Le tableau~\ref{tab:rq3-hm-intensite} compare de la même façon histogram match
 Sur le test OOD, la différence moyenne histogram matching $-$ intensité vaut $-0{,}007$ [$-0{,}023$ ; 0,009] ($p = 0{,}062$ ; 110 sujets en faveur d'histogram matching, 142 en faveur de l'intensité).
 Sur le test ID, elle vaut $-0{,}010$ [$-0{,}025$ ; 0,005] ($p = 0{,}35$).
 Le seul écart net par centre concerne R031 : $-0{,}059$ ($p = 0{,}0018$ ; 10 sujets contre 27), qui reste sous 0,05 après une correction de Bonferroni sur les six centres.
-Histogram matching a en revanche un F1 des lésions OOD supérieur à celui de la baseline (0,486 contre 0,477) et le plus faible écart absolu de volume de toutes les techniques (9,1~ml, tableau~\ref{tab:rq3-secondaires}).
+Histogram matching a en revanche un F1 des lésions OOD supérieur à celui de la baseline (0,486 contre 0,477) et le plus faible écart absolu de volume de toutes les techniques (9,1~mL, tableau~\ref{tab:rq3-secondaires}).
 
 \begin{table}[htbp]
   \centering
@@ -217,12 +218,12 @@ Histogram matching a en revanche un F1 des lésions OOD supérieur à celui de l
 Les résultats de DANN et de TENT ne sont pas des défaillances techniques. La run DANN est allée à son terme, avec un contrôle de reprise validé (section~\ref{sec:rq3-limites}). TENT a été appliqué au modèle baseline sur les mêmes sujets. Les deux sont évalués comme les autres techniques.
 Pour DANN, l'alignement des caractéristiques entre 39 centres n'apporte rien de mesurable.
 Une explication compatible avec nos données est que les échecs OOD dépendent surtout de la taille et du contraste des lésions (section~\ref{sec:rq3-echecs}), deux facteurs que l'alignement des centres ne traite pas.
-Pour TENT, la minimisation de l'entropie rend les prédictions plus tranchées sans étiquettes. La baisse touche surtout les lésions de plus de 50~ml (0,71 contre 0,74, tableau~\ref{tab:rq3-taille}).
+Pour TENT, la minimisation de l'entropie rend les prédictions plus tranchées sans étiquettes. La baisse touche surtout les lésions de plus de 50~mL (0,71 contre 0,74, tableau~\ref{tab:rq3-taille}).
 
 \paragraph{Métriques secondaires.}
 Elles ne suivent pas toujours le Dice (tableau~\ref{tab:rq3-secondaires}).
 Le F1 des lésions OOD baisse avec l'intensité (0,450 contre 0,477), BigAug (0,420), FDA et DANN (0,366 et 0,367) ; il augmente avec histogram matching (0,486) et TENT (0,495).
-L'écart absolu de volume baisse surtout avec histogram matching (9,1~ml contre 11,1~ml), puis avec l'intensité (10,0~ml) et BigAug (10,9~ml).
+L'écart absolu de volume baisse surtout avec histogram matching (9,1~mL contre 11,1~mL), puis avec l'intensité (10,0~mL) et BigAug (10,9~mL).
 
 \begin{table}[htbp]
   \centering
@@ -230,7 +231,7 @@ L'écart absolu de volume baisse surtout avec histogram matching (9,1~ml contre 
   \label{tab:rq3-secondaires}
   \begin{tabular}{lccc}
     \toprule
-    Technique & F1 des lésions & HD95 (mm) & Écart absolu de volume (ml) \\
+    Technique & F1 des lésions & HD95 (mm) & Écart absolu de volume (mL) \\
     \midrule
     Baseline & 0,477 & 24,9 & 11,1 \\
     Intensité & 0,450 & 25,5 & 10,0 \\
@@ -247,7 +248,7 @@ L'écart absolu de volume baisse surtout avec histogram matching (9,1~ml contre 
 Les meilleurs Dice de validation vont de 0,427 à 0,443 (\nolinkurl{adaptation/outputs/rq3/entrainement.csv}). La validation ne départage donc pas les techniques.
 Le Dice de validation (environ 0,43) est plus bas que celui du test ID (0,646) pour deux raisons.
 La validation porte sur neuf centres non vus.
-Ses lésions sont aussi plus petites : médiane de 1,26~ml et 43~\% sous 1~ml, contre 7,56~ml et 18~\% au test ID (volumes \texttt{lesion\_ml} des fichiers \texttt{qc.json}).
+Ses lésions sont aussi plus petites : médiane de 1,26~mL et 43~\% sous 1~mL, contre 7,56~mL et 18~\% au test ID (volumes \texttt{lesion\_ml} des fichiers \texttt{qc.json}).
 
 \section{Analyse des échecs}
 \label{sec:rq3-echecs}
@@ -270,10 +271,10 @@ Le contraste T1 est la différence entre le z-score moyen de la lésion et celui
     \toprule
     & & & & & & \multicolumn{7}{c}{Dice moyen} \\
     \cmidrule(lr){7-13}
-    Centre & \makecell{Sujets\\(lésion)} & \makecell{Vol.\\(ml)} & J & W1 & Contraste & Base. & Int. & BigAug & FDA & HM & DANN & TENT \\
+    Centre & \makecell{Sujets\\(lésion)} & \makecell{Vol.\\(mL)} & J & W1 & Contraste & Base. & Int. & BigAug & FDA & HM & DANN & TENT \\
     \midrule
     R008 & 7 (7) & 0,95 & 1 & 0,216 & $-$0,17 & 0,00 & 0,00 & 0,01 & 0,00 & 0,02 & 0,00 & 0,00 \\
-    R031 & 37 (37) & 6,74 & 138 & 0,164 & $-$0,98 & 0,62 & 0,67 & 0,66 & 0,65 & 0,61 & 0,63 & 0,62 \\
+    R031 & 37 (37) & 6,74 & 138 & 0,162 & $-$0,98 & 0,62 & 0,67 & 0,66 & 0,65 & 0,61 & 0,63 & 0,62 \\
     R028 & 26 (26) & 4,94 & 576 & 0,157 & $-$0,82 & 0,66 & 0,65 & 0,65 & 0,64 & 0,66 & 0,65 & 0,66 \\
     SOOP & 169 (167) & 22,75 & -- & 0,023 & $-$0,69 & 0,54 & 0,57 & 0,57 & 0,54 & 0,57 & 0,53 & 0,52 \\
     R053 & 5 (4) & 0,81 & 25 & 0,020 & $-$0,50 & 0,20 & 0,20 & 0,20 & 0,22 & 0,24 & 0,25 & 0,20 \\
@@ -294,7 +295,7 @@ Le contraste T1 est la différence entre le z-score moyen de la lésion et celui
 La taille est le facteur le plus net.
 Sur les 265 sujets OOD, la corrélation de Spearman entre le volume de la lésion et le Dice (modèle intensité) vaut $\rho = 0{,}53$ ($p < 10^{-4}$).
 Le tableau~\ref{tab:rq3-taille} et la figure~\ref{fig:rq3-dice-taille} montrent que toutes les techniques suivent le même profil.
-L'intensité gagne surtout entre 1 et 50~ml (0,50 et 0,67 contre 0,46 et 0,64 pour la baseline). BigAug gagne surtout au-dessus de 10~ml (0,68 et 0,77 contre 0,64 et 0,74).
+L'intensité gagne surtout entre 1 et 50~mL (0,50 et 0,67 contre 0,46 et 0,64 pour la baseline). BigAug gagne surtout au-dessus de 10~mL (0,68 et 0,77 contre 0,64 et 0,74).
 
 \begin{table}[htbp]
   \centering
@@ -303,7 +304,7 @@ L'intensité gagne surtout entre 1 et 50~ml (0,50 et 0,67 contre 0,46 et 0,64 po
   \small
   \begin{tabular}{lcccc}
     \toprule
-    Technique & $< 1$~ml & 1--10~ml & 10--50~ml & $\geq 50$~ml \\
+    Technique & $< 1$~mL & 1--10~mL & 10--50~mL & $\geq 50$~mL \\
     \midrule
     Sujets OOD (ID) & 41 (34) & 86 (65) & 80 (48) & 58 (38) \\
     \midrule
@@ -339,10 +340,10 @@ La figure~\ref{fig:rq3-echecs-taille} reprend le test OOD en y ajoutant l'adapta
 
 Toutes les techniques obtiennent un Dice nul ou presque sur R008. Le Dice moyen de BigAug est de 0,006 sur le centre ; un seul sujet est non nul, à 0,04 (tableau~\ref{tab:rq3-bigaug-intensite} ; moyenne arrondie à 0,01 dans le tableau~\ref{tab:rq3-centres}). Celui d'histogram matching est de 0,019, avec un seul sujet non nul, à 0,13 (tableau~\ref{tab:rq3-hm-intensite}). Le détail par sujet est dans \nolinkurl{zoom_R008_R053.csv}.
 \begin{itemize}
-  \item Six sujets sur sept sont imagés au premier jour après l'AVC. Leurs lésions font de 0,1 à 4,1~ml.
+  \item Six sujets sur sept sont imagés au premier jour après l'AVC. Leurs lésions font de 0,1 à 4,1~mL.
   \item Les lésions sont peu visibles en T1 : contraste médian de $-0{,}17$, contre $-0{,}50$ à $-0{,}98$ dans les autres centres OOD.
   \item Les intensités sont atypiques : 1,1 à 1,7~\% des voxels du cerveau dépassent $z = 3$, contre 0,003~\% en médiane chez les autres sujets OOD (\nolinkurl{contraste_lesions.csv}).
-  \item Le modèle prédit de 0,4 à 33,6~ml répartis en nombreuses composantes, pour une différence du nombre de lésions de 9 à 67.
+  \item Le modèle prédit de 0,4 à 33,6~mL répartis en nombreuses composantes, pour une différence du nombre de lésions de 9 à 67.
   \item À l'examen des coupes, vaisseaux, sinus et dure-mère apparaissent hyperintenses.
 \end{itemize}
 % Les coupes de R008 (figures/rq3/rq3_echecs_coupes_R008.png) ne sont pas incluses :
@@ -356,7 +357,7 @@ Cette hypothèse reste à vérifier sur le protocole d'acquisition de R008 et su
 \subsection{Centre R053}
 
 Le Dice moyen de R053 est de 0,20 sur quatre sujets ; un cinquième sujet a un masque vide et est exclu du Dice.
-Deux lésions minuscules (0,13 et 0,015~ml) ont un Dice de 0. Les deux autres (1,5 et 2,6~ml) obtiennent 0,27 et 0,52.
+Deux lésions minuscules (0,13 et 0,015~mL) ont un Dice de 0. Les deux autres (1,5 et 2,6~mL) obtiennent 0,27 et 0,52.
 Les intensités sont dans la norme (99\textsuperscript{e} centile du z-score proche de 1,8) et le contraste vaut $-0{,}50$.
 L'échec s'explique par la taille des lésions, pas par un décalage d'intensité. Avec quatre sujets, la moyenne du centre est très instable.
 
@@ -365,9 +366,9 @@ L'échec s'explique par la taille des lésions, pas par un décalage d'intensit�
 La distance de Wasserstein entre histogrammes d'intensité (\nolinkurl{analysis/center_distance.py}, référence = tous les autres centres) ne prédit pas le Dice dans nos runs (\nolinkurl{spearman.csv}).
 \begin{itemize}
   \item Sur les six centres OOD, $\rho$ va de $-0{,}43$ à $-0{,}03$ selon la technique ($p$ de 0,40 à 0,96). Avec la MMD, $\rho$ va de $-0{,}37$ à $-0{,}09$.
-  \item Sur les 44 centres de test (ID et OOD), $\rho$ va de 0,03 à 0,12 ($p \geq 0{,}44$).
+  \item Sur les 44 centres de test (ID et OOD), $\rho$ va de 0,04 à 0,12 ($p \geq 0{,}44$).
 \end{itemize}
-La figure~\ref{fig:rq3-distance} en donne deux contre-exemples. R053 est l'un des centres les plus proches (0,020) et l'un des pires. R031 est éloigné (0,164) et parmi les meilleurs.
+La figure~\ref{fig:rq3-distance} en donne deux contre-exemples. R053 est l'un des centres les plus proches (0,020) et l'un des pires. R031 est éloigné (0,162) et parmi les meilleurs.
 Six centres offrent une puissance très faible : nous ne concluons pas à l'absence de lien, seulement qu'il n'apparaît pas ici.
 
 \begin{figure}[htbp]
@@ -446,7 +447,7 @@ Les Dice préquentiels portent sur 108 des 268 sujets OOD ; ils ne se comparent 
   \item \textbf{Environnement de DANN.} DANN a été entraînée sur Colab avec torch 2.14.1+cu130 jusqu'à l'itération 35\,889, puis sur Kaggle avec torch 2.11.0+cu130, comme les autres runs. Les deux plateformes utilisent un GPU T4 et CUDA 13.0. Le meilleur modèle (itération 24\,000) vient de la partie Colab. La différence de version de torch peut changer les calculs numériques ; son effet n'a pas été mesuré.
   \item \textbf{Poids de DANN.} Avec un poids de 1, la première run DANN a divergé (perte totale de 10\,508 à l'itération 100 et de 33 millions à l'itération 400). Le poids de 0,1 et la LayerNorm ont été choisis pour la stabilité, sans recherche d'hyperparamètres. Un autre poids pourrait donner un autre résultat.
   \item \textbf{Validation sur des centres non vus.} Ses lésions sont plus petites que celles du test. Elle sert à choisir le checkpoint, mais son Dice (environ 0,43) n'estime pas la performance ID.
-  \item \textbf{Diagnostic fp16.} La première baseline, entraînée en fp16, a produit des NaN : des patches entiers donnaient des logits NaN dès l'itération 160 à 180 environ, alors que le fp32 restait stable sur les mêmes lots. Toutes les runs ont été refaites en fp32, environ deux fois plus lentement. La couche qui déborde n'a pas été localisée.
+  \item \textbf{Diagnostic fp16.} La première baseline, entraînée en fp16, a produit des NaN : des patches entiers donnaient des logits NaN dès l'itération 160 à 180 environ, alors que le fp32 restait stable sur les mêmes lots. Toutes les runs ont été refaites en fp32, environ deux fois plus lentement. nnU-Net (chapitre précédent) s'entraîne en précision mixte fp16 sans incident ; les NaN concernent notre implémentation MONAI, où la couche en cause n'a pas été localisée.
   \item \textbf{Bug de reprise corrigé.} Dans la version du code utilisée pour les runs, la ligne de progression écrasait la file des états aléatoires sauvegardés pour la reprise. Le défaut ne concerne que les reprises, donc uniquement DANN. Il a été corrigé et couvert par un test. Le checkpoint de DANN a été réparé avant la reprise en ne gardant que les quatre derniers états, qui étaient les bons ; les poids n'ont pas changé.
   \item \textbf{Référence de la distance de domaine.} Pour chaque centre, la référence de \nolinkurl{center_distance} regroupe tous les autres centres, OOD compris, et pas seulement les centres d'entraînement du pli~0. La distance mesure donc l'écart au reste du jeu de données, pas exactement l'écart à ce que le modèle a vu.
   \item \textbf{Version du code d'histogram matching.} Cette run a utilisé une version ultérieure du code (\texttt{dbf2f28} au lieu de \texttt{7449c49}), qui ne diffère que par la correction du bug de reprise. Sans DANN ni reprise, les deux versions donnent des poids identiques (vérifié par un court entraînement sur CPU, pour la baseline et l'intensité).
@@ -468,6 +469,6 @@ Le livrable C8 (\nolinkurl{adaptation/inference.py}) segmente un T1 et renvoie l
 Le modèle retenu pour la démonstration est celui de l'intensité.
 À Dice égal avec BigAug, ce choix repose d'abord sur son gain significatif après correction, ensuite sur un entraînement plus court (5,0~h contre 8,1~h).
 Son F1 des lésions est supérieur à celui de BigAug (0,450 contre 0,420) mais inférieur à celui de la baseline (0,477) : ce n'est qu'un argument relatif face à BigAug.
-Histogram matching a le plus faible écart absolu de volume (9,1~ml contre 10,0~ml pour l'intensité) et un F1 des lésions supérieur à celui de la baseline (0,486 contre 0,477).
+Histogram matching a le plus faible écart absolu de volume (9,1~mL contre 10,0~mL pour l'intensité) et un F1 des lésions supérieur à celui de la baseline (0,486 contre 0,477).
 Il n'a pas été retenu, car son gain en Dice n'est pas significatif et il exigerait d'harmoniser aussi chaque volume à l'inférence, avec l'histogramme de référence de R059.
-Ces constats orientent la suite vers la prédiction des cas à risque, en particulier les lésions de moins de 1~ml et les AVC en phase aiguë.
+Ces constats orientent la suite vers la prédiction des cas à risque, en particulier les lésions de moins de 1~mL et les AVC en phase aiguë.

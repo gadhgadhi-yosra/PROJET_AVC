@@ -1,0 +1,31 @@
+% Annexe glossaire, à inclure dans docs/rapport/rapport.tex après \appendix.
+% Traduction du glossaire du rapport nnU-Net 3D d'Anas (partie « Terms »).
+
+\chapter{Glossaire}
+\label{chap:glossaire}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Termes utilisés dans le rapport.}
+  \label{tab:glossaire}
+  \small
+  \begin{tabular}{lp{0.62\linewidth}}
+    \toprule
+    Terme & Signification \\
+    \midrule
+    Dice & recouvrement entre la lésion prédite et celle de l'expert : $2 \times$ recouvrement / (prédit + vrai). 0 = aucun, 1 = parfait \\
+    HD95 & distance entre les bords de la lésion prédite et de la vraie lésion, en mm, en ignorant les 5~\% de points les plus éloignés ; plus bas est meilleur \\
+    F1 par lésion & compte des lésions au lieu de voxels : une lésion est trouvée si la prédiction la touche ; combine lésions trouvées et fausses alarmes \\
+    ID / OOD & in-distribution (centres vus à l'entraînement) / out-of-distribution (centres jamais vus) \\
+    Pseudo-Dice & Dice que nnU-Net calcule sur des patches de validation pendant l'entraînement ; plus élevé que le vrai Dice sur des IRM entières, il sert seulement à suivre l'entraînement \\
+    Époque & ici, 250 lots de 2 patches \\
+    Sous-apprentissage & le modèle n'a pas encore assez appris : les erreurs d'entraînement et de validation baissent toutes deux encore \\
+    Sur-apprentissage & le modèle mémorise le jeu d'entraînement : l'erreur d'entraînement baisse pendant que l'erreur de validation remonte \\
+    Supervision profonde & la perte est aussi calculée sur les sorties de plus basse résolution du décodeur, ce qui aide les couches profondes à apprendre \\
+    Normalisation d'instance & remet chaque carte de caractéristiques de chaque IRM à une moyenne de 0 et un écart-type de 1 ; fonctionne avec des lots de seulement 2 \\
+    Leaky ReLU & activation : $x$ si $x > 0$, sinon $0{,}01\,x$ \\
+    Bloc résiduel & deux convolutions plus un raccourci qui ajoute l'entrée à la sortie, si bien que l'information et les gradients peuvent sauter le bloc \\
+    Augmentation au test & prédire l'IRM et ses copies en miroir, puis faire la moyenne \\
+    \bottomrule
+  \end{tabular}
+\end{table}

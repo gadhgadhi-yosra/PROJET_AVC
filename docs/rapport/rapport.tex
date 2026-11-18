@@ -1,0 +1,110 @@
+% Rapport final du projet AVC. Compilation depuis la racine du dépôt (chemins des chapitres et des figures) :
+%   pdflatex -output-directory data/rapport_test docs/rapport/rapport.tex
+%   bibtex data/rapport_test/rapport
+%   pdflatex -output-directory data/rapport_test docs/rapport/rapport.tex   (deux fois)
+\documentclass[11pt,a4paper]{report}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{float}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\def\frenchtablename{Tableau}
+\addto\captionsfrench{\def\tablename{Tableau}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{3cm}
+  {\Huge\bfseries Projet AVC\par}
+  \vspace{1cm}
+  {\Large Segmentation des lésions d'AVC en IRM T1 multicentrique :\\ généralisation à des centres non vus\par}
+  \vspace{2.5cm}
+  {\large Yosra Gadhgadhi \quad Anas Karim \quad Fayfa Hachicha\par}
+  \vspace{1.5cm}
+  {\large Tek-Up\par}
+  \vfill
+  {\large Novembre 2026\par}
+\end{titlepage}
+
+\tableofcontents
+
+\chapter*{Introduction générale}
+\addcontentsline{toc}{chapter}{Introduction générale}
+\label{chap:introduction}
+
+\section*{Contexte}
+
+Le projet étudie la segmentation automatique des lésions d'AVC sur des IRM cérébrales pondérées en T1, acquises dans de nombreux centres.
+Les données viennent d'ATLAS v3 (ISLES'26), qui reprend les sujets d'ATLAS v2.0~\cite{liew2022atlas} et en ajoute d'autres, dont ceux du centre SOOP (\nolinkurl{exploration/02_figures.py}, \nolinkurl{data/README.md}).
+Les différences de scanner, de protocole et de résolution entre centres modifient la distribution des images ; un modèle entraîné sur certains centres peut perdre en performance sur d'autres.
+
+L'inventaire compte 1\,453 IRM dans 55 centres ; le retrait des 37 IRM du centre R032 donne les 1\,416 IRM du chapitre~\ref{chap:anas}, et la mise en quarantaine d'une IRM du centre R065 donne les 1\,415 IRM de la livraison v2 utilisée aux chapitres~\ref{chap:yosra} et~\ref{chap:rq3} (\nolinkurl{analysis/reports/qc_by_center/summary.json}, \nolinkurl{analysis/reports/qc_by_center/exclusion_reasons.csv}).
+
+\section*{Questions de recherche}
+
+\begin{itemize}
+  \item \textbf{RQ1.} Quel est l'écart de performance entre le test ID (centres vus à l'entraînement) et le test OOD (centres jamais vus) ?
+  \item \textbf{RQ2.} Les architectures Transformer améliorent-elles la généralisation par rapport à nnU-Net ?
+  \item \textbf{RQ3.} Quelles techniques de data augmentation et/ou d'adaptation de domaine réduisent le plus efficacement l'écart de performance entre centres ?
+\end{itemize}
+La question RQ2 portait initialement sur les architectures Transformer.
+Aucun Transformer n'a été évalué : le travail réalisé compare un CNN 2.5D, un U-Net 3D et un ResEnc U-Net (chapitre~\ref{chap:anas}).
+
+\section*{Répartition du travail}
+
+\begin{itemize}
+  \item \textbf{Yosra Gadhgadhi} (chapitre~\ref{chap:yosra}) : inventaire et contrôle qualité des données, prétraitement, partitions communes, mesures du décalage de domaine, démonstration et intégration.
+  \item \textbf{Anas Karim} (chapitre~\ref{chap:anas}) : baselines CNN 2.5D et ML, nnU-Net 3D, comparaison U-Net / ResEnc U-Net.
+  \item \textbf{Fayfa Hachicha} (chapitre~\ref{chap:rq3}) : techniques de généralisation et d'adaptation (RQ3), analyse des échecs, adaptation continue contrôlée, modèle de la démonstration (C8).
+\end{itemize}
+
+\section*{Deux protocoles d'évaluation}
+\label{sec:deux-protocoles}
+
+Le rapport utilise deux découpages différents des données. Leurs chiffres ne se comparent pas directement.
+
+\begin{itemize}
+  \item \textbf{Découpage historique} (chapitre~\ref{chap:anas}) : 903 IRM d'entraînement et 226 de validation ID dans 40 centres, 287 IRM de test OOD dans 14 centres tirés au hasard (graine 0, au plus 60 patients par centre). Il sert au CNN 2.5D, aux baselines ML et à nnU-Net 3D.
+  \item \textbf{Découpage \nolinkurl{splits.json} v2} (chapitres~\ref{chap:yosra} et~\ref{chap:rq3}) : 6 centres OOD (R008, R028, R031, R034, R053, SOOP, 268 IRM) choisis selon leur taille et leur distance d'intensité, et 5 plis sur les autres centres. Le pli~0, utilisé pour RQ3, compte 733 IRM d'entraînement, 183 de validation (9 centres absents de l'entraînement) et 185 de test ID.
+\end{itemize}
+
+Les deux protocoles n'ont ni les mêmes centres de test, ni les mêmes centres d'entraînement, ni le même prétraitement (prétraitement automatique de nnU-Net au chapitre~\ref{chap:anas}, prétraitement S4 aux chapitres~\ref{chap:yosra} et~\ref{chap:rq3}), ni les mêmes modèles.
+Par exemple, le centre R049 est OOD dans le découpage historique mais fait partie de l'entraînement dans \nolinkurl{splits.json} v2.
+Un Dice du chapitre~\ref{chap:anas} et un Dice du chapitre~\ref{chap:rq3} ne mesurent donc pas la même chose ; aucun tableau de ce rapport ne les réunit.
+
+Dans le découpage historique, le Dice OOD dépasse le Dice ID.
+Le chapitre~\ref{chap:anas} l'explique par la composition des centres OOD tirés : leurs lésions sont plus grandes (médiane de 5,6~mL contre 3,7~mL en ID) et surtout chroniques, donc plus faciles à segmenter ; dans chaque classe de taille de lésion, l'OOD reste supérieur ou égal à l'ID.
+Ce résultat repose sur un seul découpage.
+Dans \nolinkurl{splits.json} v2, les centres OOD ont au contraire été choisis pour leur distance d'intensité, et le Dice OOD y est inférieur au Dice ID (chapitre~\ref{chap:rq3}).
+
+% ---------------------------------------------------------------- chapitres
+\input{docs/rapport/chapitre_yosra}
+\input{docs/rapport/chapitre_anas}
+\input{docs/rapport/chapitre_rq3}
+
+\chapter*{Conclusion générale}
+\addcontentsline{toc}{chapter}{Conclusion générale}
+\label{chap:conclusion}
+
+Le projet fournit une chaîne complète, de l'inventaire des données à une démonstration qui segmente une IRM T1 et en mesure la lésion.
+Le chapitre~\ref{chap:yosra} établit les données, les partitions communes et les mesures du décalage entre centres.
+Le chapitre~\ref{chap:anas} montre qu'un nnU-Net 3D dépasse nettement le CNN 2.5D, qu'un réseau plus grand n'apporte rien à budget de temps égal, et que les modèles restent sous-entraînés.
+Le chapitre~\ref{chap:rq3} montre que, sur son protocole, seule l'augmentation d'intensité améliore le Dice OOD de façon significative après correction, sans supprimer l'écart entre ID et OOD, et que la distance d'intensité entre centres ne prédit pas le Dice OOD.
+Dans les chapitres~\ref{chap:anas} et~\ref{chap:rq3}, les cas les plus difficiles sont les petites lésions et les AVC aigus, peu visibles en T1.
+Deux limites demeurent : aucun Transformer n'a été évalué, si bien que la question RQ2 n'est traitée que par la comparaison d'un CNN 2.5D, d'un U-Net 3D et d'un ResEnc U-Net ; et les deux protocoles d'évaluation restent distincts.
+La suite naturelle est d'évaluer les meilleurs modèles sur un même découpage et sur plusieurs plis.
+
+\appendix
+\input{docs/rapport/annexe_glossaire}
+
+\bibliographystyle{plain}
+\bibliography{docs/rapport/references_rq3}
+
+\end{document}
